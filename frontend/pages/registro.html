@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Registro — Lumina Films</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    html,body{height:100%;background:var(--ink)}
+    .auth-wrap{min-height:100vh;display:flex;background:radial-gradient(ellipse at 80% 50%,rgba(212,168,67,.05),transparent 50%),var(--ink)}
+    .auth-panel{width:100%;max-width:560px;display:flex;flex-direction:column;justify-content:center;padding:40px;background:var(--ink-1);border-right:1px solid rgba(255,255,255,.04)}
+    .auth-deco{flex:1;display:none;position:relative;overflow:hidden}
+    .auth-deco-img{position:absolute;inset:0;background:url('https://image.tmdb.org/t/p/w780/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg') center/cover}
+    .auth-deco-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,12,14,.5),rgba(12,12,14,.15))}
+    .auth-deco-text{position:relative;z-index:2;padding:48px;display:flex;flex-direction:column;height:100%;justify-content:flex-end}
+    @media(min-width:900px){.auth-deco{display:flex}.auth-panel{width:560px;flex-shrink:0}}
+    .back-link{display:inline-flex;align-items:center;gap:8px;color:var(--smoke);font-size:13px;font-weight:600;text-decoration:none;margin-bottom:32px;transition:color .2s}
+    .back-link:hover{color:var(--ember)}
+    .back-link svg{width:16px;height:16px;fill:currentColor}
+  </style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-panel">
+    <a href="/" class="back-link">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      Volver al inicio
+    </a>
+    <div style="margin-bottom:24px">
+      <a href="/" id="regLogo" style="display:flex;align-items:center;gap:10px;text-decoration:none"><span id="regLogoSvg"></span><span style="font-family:var(--font-display);font-size:1.8rem;color:var(--cream);font-style:italic"><em>Lumina</em> <span style="color:var(--ember)">Films</span></span></a>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--smoke);margin-top:2px">Cinema Experience</div>
+    </div>
+    <h2 style="font-family:var(--font-display);font-size:1.8rem;color:var(--cream);margin-bottom:6px">Crear tu cuenta</h2>
+    <p style="color:var(--smoke);font-size:14px;margin-bottom:28px">Únete y compra tus tiquetes en línea</p>
+    <div id="alertBox"></div>
+    <form id="regForm">
+      <div class="form-group">
+        <label class="form-label">Nombre completo</label>
+        <input type="text" class="form-control" id="nombre" placeholder="Tu nombre completo" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Correo electrónico</label>
+        <input type="email" class="form-control" id="email" placeholder="tu@email.com" required>
+      </div>
+      <div class="row-2">
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" class="form-control" id="password" placeholder="Mín. 8 caracteres" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar</label>
+          <input type="password" class="form-control" id="confirmPassword" placeholder="Repetir" required>
+        </div>
+      </div>
+      <!-- Password strength -->
+      <div id="strengthWrap" style="margin-top:-14px;margin-bottom:20px;display:none">
+        <div style="height:3px;background:var(--ink-4);border-radius:2px;overflow:hidden;margin-bottom:5px">
+          <div id="strengthBar" style="height:100%;border-radius:2px;transition:width .3s,background .3s;width:0%"></div>
+        </div>
+        <span id="strengthLabel" style="font-size:11px;color:var(--smoke)"></span>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;padding:15px;font-size:13px">Crear cuenta</button>
+      <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--smoke)">¿Ya tienes cuenta? <a href="/pages/login.html" style="color:var(--ember);font-weight:600">Inicia sesión</a></div>
+    </form>
+  </div>
+  <div class="auth-deco">
+    <div class="auth-deco-img"></div>
+    <div class="auth-deco-overlay"></div>
+    <div class="auth-deco-text">
+      <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:14px;font-weight:600;line-height:1.15">Tu próxima aventura cinematográfica te espera</div>
+      <p style="color:rgba(196,196,207,.75);font-size:14px;line-height:1.7">Más de 14 películas, 2 salas premium y tiquetes en segundos.</p>
+    </div>
+  </div>
+</div>
+<script src="/js/api.js"></script>
+<script>
+if(Auth.isLogged()) location.href='/';
+document.getElementById('password').addEventListener('input',function(){
+  const v=this.value;
+  const w=document.getElementById('strengthWrap');
+  if(!v){w.style.display='none';return;}w.style.display='';
+  let s=0;
+  if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
+  const c=[{w:'25%',bg:'var(--danger)',l:'Muy débil'},{w:'50%',bg:'#e0883a',l:'Débil'},{w:'75%',bg:'var(--ember)',l:'Moderada'},{w:'100%',bg:'var(--success)',l:'Fuerte'}];
+  const r=c[s-1]||c[0];
+  document.getElementById('strengthBar').style.cssText=`height:100%;border-radius:2px;transition:width .3s,background .3s;width:${r.w};background:${r.bg}`;
+  document.getElementById('strengthLabel').textContent=r.l;
+});
+document.getElementById('regForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const ab=document.getElementById('alertBox');ab.innerHTML='';
+  const btn=e.target.querySelector('button[type=submit]');
+  btn.disabled=true;btn.textContent='Creando cuenta…';
+  const pw=document.getElementById('password').value,cp=document.getElementById('confirmPassword').value;
+  if(pw!==cp){ab.innerHTML=`<div class="alert alert-error">✕ Las contraseñas no coinciden</div>`;btn.disabled=false;btn.textContent='Crear cuenta';return;}
+  try{
+    await post('/auth/registro',{nombre:document.getElementById('nombre').value,email:document.getElementById('email').value,password:pw,confirmPassword:cp});
+    ab.innerHTML=`<div class="alert alert-success">✓ Cuenta creada. Redirigiendo…</div>`;
+    setTimeout(()=>location.href='/pages/login.html',1500);
+  }catch(err){ab.innerHTML=`<div class="alert alert-error">✕ ${err.message}</div>`;btn.disabled=false;btn.textContent='Crear cuenta';}
+});
+</script>
+<script>
+document.getElementById('regLogoSvg').innerHTML = getLuminaLogo(32);
+</script>
+</body>
+</html>

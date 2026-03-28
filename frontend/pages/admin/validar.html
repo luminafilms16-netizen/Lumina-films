@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Validar Tiquetes — Admin Lumina Films</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    .admin-layout{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 72px)}
+    .admin-sidebar{background:var(--ink-1);border-right:1px solid rgba(255,255,255,.04);position:sticky;top:72px;height:calc(100vh - 72px);overflow-y:auto;display:flex;flex-direction:column}
+    .sb-brand{padding:var(--s5) var(--s5) var(--s4);border-bottom:1px solid rgba(255,255,255,.04)}
+    .sb-brand-sub{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--smoke);margin-top:4px}
+    .sb-admin-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.2);font-size:10px;font-weight:700;color:var(--ember);margin-top:var(--s3)}
+    .sb-nav{flex:1;padding:var(--s4) 0}
+    .sb-section{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-4);padding:0 var(--s5);margin:var(--s5) 0 var(--s2)}
+    .sb-link{display:flex;align-items:center;gap:var(--s3);padding:10px var(--s5);color:var(--smoke);font-size:13px;font-weight:600;border-left:2px solid transparent;cursor:pointer;text-decoration:none;transition:all var(--t2) var(--ease)}
+    .sb-link:hover{color:var(--mist);background:rgba(255,255,255,.02)}
+    .sb-link.active{color:var(--cream);background:var(--ember-pale);border-left-color:var(--ember)}
+    .sb-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sb-user{border-top:1px solid rgba(255,255,255,.04);padding:var(--s4) var(--s5);display:flex;align-items:center;gap:var(--s3)}
+    .sb-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--ember-dim),var(--ember));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--ink);flex-shrink:0}
+    .sb-uname{font-size:13px;font-weight:600;color:var(--cream)}
+    .sb-urole{font-size:11px;color:var(--smoke)}
+    .admin-content{padding:var(--s7) var(--s7) var(--s9);overflow-x:hidden}
+    .val-section{background:var(--ink-2);border:1px solid rgba(255,255,255,.05);border-radius:var(--r3);padding:var(--s6);margin-bottom:var(--s5)}
+    .val-section-label{font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--ember);margin-bottom:var(--s4);display:flex;align-items:center;gap:var(--s2)}
+    .code-input-row{display:flex;gap:var(--s3)}
+    .code-input{flex:1;padding:14px 20px;background:var(--ink-3);border:1px solid var(--ink-4);border-radius:var(--r2);color:var(--cream);font-family:var(--font-mono);font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none;transition:all var(--t2) var(--ease)}
+    .code-input:focus{border-color:var(--ember-dim);box-shadow:0 0 0 3px var(--ember-pale)}
+    .code-input::placeholder{text-transform:none;letter-spacing:0;color:var(--smoke)}
+    .sim-btns{display:flex;gap:var(--s2);margin-top:var(--s3);flex-wrap:wrap;align-items:center}
+    .sim-btn{padding:6px 14px;border-radius:100px;border:1px solid var(--ink-4);background:transparent;color:var(--smoke);font-size:11px;font-weight:700;font-family:var(--font-body);cursor:pointer;transition:all var(--t2) var(--ease)}
+    .sim-btn:hover{border-color:var(--ember-dim);color:var(--ember);background:var(--ember-pale)}
+    #qr-reader{border-radius:var(--r3);overflow:hidden;background:var(--ink-3)}
+    .result-wrap{animation:fadeUp .5s cubic-bezier(.34,1.56,.64,1) both}
+    .result-card{padding:var(--s6);border-radius:var(--r3);text-align:center;border:1px solid}
+    .res-valid{background:rgba(76,175,130,.06);border-color:rgba(76,175,130,.25)}
+    .res-used{background:var(--ember-pale);border-color:rgba(212,168,67,.25)}
+    .res-invalid{background:rgba(224,85,85,.06);border-color:rgba(224,85,85,.25)}
+    .res-icon{font-size:3.5rem;display:block;margin-bottom:var(--s4)}
+    .res-title{font-family:var(--font-display);font-size:1.8rem;margin-bottom:var(--s2)}
+    .res-message{color:var(--smoke);font-size:14px;margin-bottom:var(--s5)}
+    .res-details{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);text-align:left}
+    .res-detail{background:rgba(255,255,255,.03);border-radius:var(--r2);padding:var(--s3) var(--s4)}
+    .rd-label{font-size:10px;color:var(--smoke);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+    .rd-value{font-size:14px;color:var(--cream);font-weight:600;margin-top:3px}
+    .log-entry{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) 0;border-bottom:1px solid rgba(255,255,255,.04)}
+    .log-entry:last-child{border:none}
+    .log-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .log-info{flex:1;min-width:0}
+    .log-code{font-family:var(--font-mono);font-size:12px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .log-time{font-size:10px;color:var(--smoke);margin-top:2px}
+    @media(max-width:900px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{display:none}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="admin-layout">
+    <aside class="admin-sidebar"></aside>
+    <div class="admin-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--s6);flex-wrap:wrap;gap:var(--s4)">
+        <div>
+          <p class="section-eyebrow">Control de acceso</p>
+          <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--cream)">Validar Tiquetes</h2>
+          <p style="color:var(--smoke);font-size:14px;margin-top:var(--s2)">Verifica tiquetes por código o escáner QR</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="clearLog()" title="Limpiar historial">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right:5px"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          Limpiar historial
+        </button>
+      </div>
+
+      <div class="grid-2" style="align-items:start">
+        <div>
+          <div class="val-section">
+            <div class="val-section-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+              Código manual
+            </div>
+            <div class="code-input-row">
+              <input class="code-input" id="codeInput" placeholder="LF-XXXXXX-XXXXXXX" maxlength="32">
+              <button class="btn btn-primary" onclick="validar()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                Validar
+              </button>
+            </div>
+            <div class="sim-btns">
+              <span style="font-size:11px;color:var(--smoke)">Simular:</span>
+              <button class="sim-btn" onclick="simulate('VALIDO')">✓ Válido</button>
+              <button class="sim-btn" onclick="simulate('USADO')">⚠ Usado</button>
+              <button class="sim-btn" onclick="simulate('INVALIDO')">✕ Inválido</button>
+            </div>
+          </div>
+          <div id="resultArea"></div>
+        </div>
+
+        <div>
+          <div class="val-section">
+            <div class="val-section-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+              Escáner QR
+            </div>
+            <div id="qr-reader" style="width:100%;min-height:60px"></div>
+            <div style="display:flex;gap:var(--s3);margin-top:var(--s4)">
+              <button class="btn btn-outline btn-sm" id="startBtn" onclick="startScan()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px"><path d="M8 5v14l11-7z"/></svg>
+                Activar cámara
+              </button>
+              <button class="btn btn-ghost btn-sm" id="stopBtn" style="display:none" onclick="stopScan()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px"><path d="M6 6h12v12H6z"/></svg>
+                Detener
+              </button>
+            </div>
+          </div>
+
+          <div class="val-section">
+            <div class="val-section-label" style="justify-content:space-between">
+              <span style="display:flex;align-items:center;gap:var(--s2)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+                Historial de validaciones
+              </span>
+              <span id="logCount" style="font-size:10px;color:var(--smoke);font-weight:400;text-transform:none;letter-spacing:0"></span>
+            </div>
+            <div id="logList">
+              <p style="color:var(--smoke);font-size:13px;text-align:center;padding:var(--s5) 0">Sin validaciones registradas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/js/api.js"></script>
+<script>
+if(!Auth.isLogged()||!Auth.isAdmin()) location.href='/pages/login.html';
+renderNavbar('admin');
+renderAdminSidebar('validar');
+
+let scanner=null, lastCode='';
+
+// Load persisted log on startup
+renderLog();
+
+document.getElementById('codeInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter') validar();
+});
+
+async function validar(forceCode=null){
+  const code=(forceCode||document.getElementById('codeInput').value).trim().toUpperCase();
+  if(!code){ toast('Ingresa un código','info'); return; }
+  if(code===lastCode) return;
+  lastCode=code;
+  try{
+    const r=await post('/tiquetes/validar',{codigo:code});
+    renderResult(r,code);
+    ValidationHistory.add({code, estado:r.estado, message:r.message});
+    renderLog();
+  }catch(err){
+    renderResult({ok:false,estado:'invalido',message:err.message},code);
+    ValidationHistory.add({code, estado:'invalido', message:err.message});
+    renderLog();
+  }finally{
+    setTimeout(()=>{ lastCode=''; },3000);
+  }
+}
+
+function simulate(type){
+  const codes={VALIDO:'LF-DEMO01-VALID25',USADO:'LF-DEMO02-USED25',INVALIDO:'LF-DEMO03-FAKE25'};
+  const code=codes[type];
+  document.getElementById('codeInput').value=code;
+  const estados={VALIDO:'valido',USADO:'usado',INVALIDO:'invalido'};
+  const messages={VALIDO:'Tiquete válido. Acceso permitido.',USADO:'Este tiquete ya fue utilizado.',INVALIDO:'El código no existe en el sistema.'};
+  const mockData={ok:type==='VALIDO',estado:estados[type],message:messages[type],
+    tiquete:type!=='INVALIDO'?{codigo:code,pelicula:'Interstellar',sala:'Sala 1 – IMAX',fecha:'2025-01-15',hora:'14:00:00',asientos:[{fila:'D',columna:4},{fila:'D',columna:5}]}:null};
+  renderResult(mockData,code);
+  ValidationHistory.add({code, estado:estados[type], message:messages[type]});
+  renderLog();
+}
+
+function renderResult(r,code){
+  const area=document.getElementById('resultArea');
+  const cfg={
+    valido:  {cls:'res-valid',   icon:'<svg width="48" height="48" viewBox="0 0 24 24" fill="#4caf82"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>', title:'¡Acceso permitido!', titleColor:'#7de8b0'},
+    usado:   {cls:'res-used',    icon:'<svg width="48" height="48" viewBox="0 0 24 24" fill="#d4a843"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>', title:'Ya utilizado', titleColor:'#d4a843'},
+    invalido:{cls:'res-invalid', icon:'<svg width="48" height="48" viewBox="0 0 24 24" fill="#e05555"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>', title:'Código inválido', titleColor:'#ff9494'}
+  };
+  const c=cfg[r.estado]||cfg.invalido;
+  const t=r.tiquete;
+  const detailsHtml=t?`<div class="res-details">
+    <div class="res-detail"><div class="rd-label">Código</div><div class="rd-value" style="font-family:var(--font-mono);font-size:12px">${t.codigo}</div></div>
+    <div class="res-detail"><div class="rd-label">Estado</div><div class="rd-value"><span class="badge badge-${r.estado}">${r.estado}</span></div></div>
+    <div class="res-detail"><div class="rd-label">Película</div><div class="rd-value">${t.pelicula||'—'}</div></div>
+    <div class="res-detail"><div class="rd-label">Sala</div><div class="rd-value">${t.sala||'—'}</div></div>
+    ${t.fecha?`<div class="res-detail"><div class="rd-label">Función</div><div class="rd-value">${fmtDateShort(t.fecha)} ${fmtTime(t.hora)}</div></div>`:''}
+    ${t.asientos?.length?`<div class="res-detail" style="grid-column:1/-1"><div class="rd-label">Asientos</div><div class="rd-value">${t.asientos.map(a=>`${a.fila}${a.columna}`).join(', ')}</div></div>`:''}
+  </div>`:`<p style="color:var(--smoke);font-size:13px">${r.message}</p>`;
+
+  area.innerHTML=`<div class="result-wrap"><div class="result-card ${c.cls}">
+    <div style="display:flex;justify-content:center;margin-bottom:var(--s4)">${c.icon}</div>
+    <div class="res-title" style="color:${c.titleColor}">${c.title}</div>
+    <p class="res-message">${r.message}</p>
+    ${detailsHtml}
+    <button class="btn btn-ghost btn-sm" style="margin-top:var(--s5)" onclick="resetResult()">Nueva validación</button>
+  </div></div>`;
+
+  if(r.estado==='valido') toast('✓ Acceso permitido','success',5000);
+  else if(r.estado==='usado') toast('⚠ Tiquete ya utilizado','info',5000);
+  else toast('✕ Código inválido','error',4000);
+}
+
+function resetResult(){
+  document.getElementById('resultArea').innerHTML='';
+  document.getElementById('codeInput').value='';
+  lastCode='';
+}
+
+function renderLog(){
+  const log=ValidationHistory.get();
+  const logEl=document.getElementById('logList');
+  document.getElementById('logCount').textContent=log.length?`${log.length} registro${log.length!==1?'s':''}`:'' ;
+  if(!log.length){
+    logEl.innerHTML='<p style="color:var(--smoke);font-size:13px;text-align:center;padding:var(--s5) 0">Sin validaciones registradas</p>';
+    return;
+  }
+  const iconBg={valido:'rgba(76,175,130,.15)',usado:'rgba(212,168,67,.15)',invalido:'rgba(224,85,85,.15)'};
+  const iconSvg={
+    valido:`<svg width="14" height="14" viewBox="0 0 24 24" fill="#4caf82"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`,
+    usado:`<svg width="14" height="14" viewBox="0 0 24 24" fill="#d4a843"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`,
+    invalido:`<svg width="14" height="14" viewBox="0 0 24 24" fill="#e05555"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`
+  };
+  logEl.innerHTML=log.slice(0,20).map(l=>{
+    const time=new Date(l.time);
+    const timeStr=isNaN(time)?'—':time.toLocaleString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    return `<div class="log-entry">
+      <div class="log-icon" style="background:${iconBg[l.estado]||'var(--ink-3)'}">${iconSvg[l.estado]||''}</div>
+      <div class="log-info">
+        <div class="log-code">${l.code}</div>
+        <div class="log-time">${timeStr}</div>
+      </div>
+      <span class="badge badge-${l.estado}" style="font-size:9px">${l.estado}</span>
+    </div>`;
+  }).join('');
+}
+
+function clearLog(){
+  if(!confirm('¿Limpiar todo el historial de validaciones?')) return;
+  ValidationHistory.clear();
+  renderLog();
+  toast('Historial limpiado','info');
+}
+
+async function startScan(){
+  if(scanner) return;
+  scanner=new Html5Qrcode('qr-reader');
+  try{
+    await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},
+      decoded=>{ validar(decoded); },()=>{});
+    document.getElementById('startBtn').style.display='none';
+    document.getElementById('stopBtn').style.display='';
+    toast('Cámara activada — apunta al código QR','info');
+  }catch(err){
+    toast('No se pudo acceder a la cámara','error');
+    scanner=null;
+  }
+}
+
+async function stopScan(){
+  if(!scanner) return;
+  await scanner.stop(); scanner.clear(); scanner=null;
+  document.getElementById('startBtn').style.display='';
+  document.getElementById('stopBtn').style.display='none';
+  document.getElementById('qr-reader').innerHTML='';
+}
+</script>
+</body>
+</html>

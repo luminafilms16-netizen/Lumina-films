@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Mi Perfil — Lumina Films</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    /* Profile hero */
+    .profile-hero {
+      background: linear-gradient(135deg, var(--ink-1) 0%, var(--ink) 100%);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      padding: var(--s9) 0 0;
+      position: relative; overflow: hidden;
+    }
+    .profile-hero::before {
+      content: '';
+      position: absolute; top: -100px; right: -100px;
+      width: 400px; height: 400px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,168,67,.05), transparent 70%);
+      pointer-events: none;
+    }
+    .profile-layout {
+      display: flex; align-items: flex-end; gap: var(--s6);
+      padding-bottom: var(--s6);
+    }
+    .profile-avatar {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--ember-dim), var(--ember));
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display); font-size: 2rem; font-weight: 700;
+      color: var(--ink); flex-shrink: 0;
+      box-shadow: 0 0 0 4px rgba(212,168,67,.15);
+    }
+    .profile-info { flex: 1; }
+    .profile-name {
+      font-family: var(--font-display); font-size: clamp(1.6rem,4vw,2.4rem);
+      color: var(--cream); font-weight: 700; margin-bottom: 4px;
+    }
+    .profile-email { font-size: 14px; color: var(--smoke); margin-bottom: 12px; }
+    .profile-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .profile-badge {
+      padding: 4px 14px; border-radius: 100px;
+      font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .pb-client { background: rgba(91,155,213,.12); color: var(--info); border: 1px solid rgba(91,155,213,.2); }
+    .pb-member { background: rgba(76,175,130,.12); color: var(--success); border: 1px solid rgba(76,175,130,.2); }
+
+    /* Tabs */
+    .profile-tabs {
+      display: flex; border-bottom: 1px solid rgba(255,255,255,.06);
+      margin-top: var(--s5); overflow-x: auto;
+    }
+    .ptab {
+      padding: 12px 24px; font-size: 12px; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--smoke); background: none; border: none; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: all var(--t2) var(--ease); font-family: var(--font-body);
+      white-space: nowrap;
+    }
+    .ptab.active { color: var(--ember); border-bottom-color: var(--ember); }
+
+    /* Stats strip */
+    .client-stats {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 14px; margin-bottom: var(--s6);
+    }
+    .cs-card {
+      background: var(--ink-2); border: 1px solid rgba(255,255,255,.05);
+      border-radius: var(--r3); padding: var(--s5);
+      text-align: center; transition: border-color var(--t2) var(--ease);
+    }
+    .cs-card:hover { border-color: rgba(212,168,67,.12); }
+    .cs-num { font-family: var(--font-display); font-size: 2rem; color: var(--ember); font-weight: 700; margin-bottom: 4px; }
+    .cs-lbl { font-size: 11px; color: var(--smoke); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+
+    /* Ticket card enhanced */
+    .ticket-enhanced {
+      background: var(--ink-1); border: 1px solid rgba(255,255,255,.05);
+      border-radius: var(--r4); overflow: hidden; margin-bottom: var(--s4);
+      transition: border-color var(--t2) var(--ease), box-shadow var(--t2) var(--ease);
+      cursor: pointer;
+    }
+    .ticket-enhanced:hover {
+      border-color: rgba(212,168,67,.15);
+      box-shadow: var(--shadow-md);
+    }
+    .te-header {
+      display: flex; align-items: stretch; gap: 0;
+    }
+    .te-strip { width: 5px; flex-shrink: 0; }
+    .te-strip.activo   { background: linear-gradient(180deg, var(--success), #2d8a5a); }
+    .te-strip.usado    { background: linear-gradient(180deg, var(--ember), var(--ember-dim)); }
+    .te-strip.cancelado{ background: linear-gradient(180deg, var(--danger), #a03333); }
+    .te-poster-wrap { width: 90px; flex-shrink: 0; overflow: hidden; }
+    .te-poster { width: 100%; height: 100%; object-fit: cover; }
+    .te-poster-ph { width: 90px; min-height: 120px; background: var(--ink-3); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+    .te-body { flex: 1; padding: var(--s4) var(--s5); min-width: 0; }
+    .te-film { font-family: var(--font-display); font-size: 1.1rem; color: var(--cream); font-weight: 600; margin-bottom: 5px; }
+    .te-meta { font-size: 12px; color: var(--smoke); margin-bottom: var(--s3); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .te-code { font-family: var(--font-mono); font-size: 12px; color: var(--ember-dim); }
+    .te-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; padding: var(--s4) var(--s5); flex-shrink: 0; gap: var(--s3); }
+    .te-total { font-family: var(--font-display); font-size: 1.3rem; color: var(--ember); font-weight: 700; }
+
+    /* Perforated border */
+    .ticket-perf {
+      display: flex; align-items: center; gap: 0;
+      padding: 0 var(--s4);
+      border-top: 1px dashed rgba(255,255,255,.08);
+    }
+    .perf-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); flex-shrink: 0; margin: -8px; }
+    .perf-line { flex: 1; height: 1px; border-top: 1px dashed rgba(255,255,255,.06); }
+    .te-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--s3) var(--s5); flex-wrap: wrap; gap: 10px;
+    }
+    .te-seats { font-family: var(--font-mono); font-size: 12px; color: var(--mist); }
+    .te-actions { display: flex; gap: 8px; }
+
+    /* QR Modal */
+    .qr-modal-content {
+      text-align: center;
+    }
+    .qr-display {
+      background: white; padding: 16px; border-radius: 12px;
+      display: inline-block; margin: var(--s5) 0;
+    }
+    .qr-display img { width: 180px; height: 180px; display: block; }
+
+    /* Empty state */
+    .empty-tickets {
+      text-align: center; padding: var(--s9) var(--s5);
+    }
+    .empty-tickets-icon {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: var(--ink-2); border: 1px solid rgba(255,255,255,.06);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; margin: 0 auto var(--s5);
+    }
+
+    /* Recommended movies */
+    .rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: var(--s4); }
+    .rec-card {
+      cursor: pointer; border-radius: var(--r3); overflow: hidden;
+      background: var(--ink-2); border: 1px solid rgba(255,255,255,.05);
+      transition: transform .3s ease, border-color .3s ease;
+    }
+    .rec-card:hover { transform: translateY(-4px); border-color: rgba(212,168,67,.15); }
+    .rec-poster { aspect-ratio: 2/3; width: 100%; object-fit: cover; }
+    .rec-poster-ph { aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: var(--ink-3); }
+    .rec-info { padding: 10px 12px; }
+    .rec-title { font-family: var(--font-display); font-size: .85rem; color: var(--cream); font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rec-meta { font-size: 10px; color: var(--smoke); }
+
+    @media(max-width:768px) {
+      .client-stats { grid-template-columns: repeat(2,1fr); }
+      .te-poster-wrap { width: 70px; }
+      .te-poster-ph { width: 70px; }
+    }
+    @media(max-width:480px) {
+      .profile-layout { flex-direction: column; align-items: flex-start; }
+      .te-right { flex-direction: row; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <!-- Profile Hero -->
+  <div class="profile-hero">
+    <div class="container">
+      <div class="profile-layout">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-info">
+          <div class="profile-name" id="profileName">Cargando…</div>
+          <div class="profile-email" id="profileEmail"></div>
+          <div class="profile-badges">
+            <span class="profile-badge pb-client">👤 Cliente</span>
+            <span class="profile-badge pb-member" id="memberSince"></span>
+          </div>
+        </div>
+        <div style="flex-shrink:0">
+          <button class="btn btn-ghost btn-sm" onclick="Auth.logout()">Cerrar sesión</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="profile-tabs">
+        <button class="ptab active" onclick="switchTab('tiquetes',this)">🎟️ Mis Tiquetes</button>
+        <button class="ptab" onclick="switchTab('recomendados',this)">🎬 Para ti</button>
+        <button class="ptab" onclick="switchTab('cuenta',this)">⚙️ Mi Cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content area -->
+  <section style="padding: var(--s7) 0 var(--s9)">
+    <div class="container">
+
+      <!-- ── TAB: TIQUETES ── -->
+      <div id="tab-tiquetes">
+        <!-- Stats -->
+        <div class="client-stats" id="clientStats">
+          <div class="cs-card"><div class="cs-num" id="statTotal">—</div><div class="cs-lbl">Tiquetes comprados</div></div>
+          <div class="cs-card"><div class="cs-num" id="statGasto">—</div><div class="cs-lbl">Total gastado</div></div>
+          <div class="cs-card"><div class="cs-num" id="statPeliculas">—</div><div class="cs-lbl">Películas vistas</div></div>
+          <div class="cs-card"><div class="cs-num" id="statActivos">—</div><div class="cs-lbl">Tiquetes activos</div></div>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:var(--s2);margin-bottom:var(--s5);flex-wrap:wrap;align-items:center">
+          <button class="filter-pill active" data-filter="all" onclick="filterTickets('all',this)">Todos</button>
+          <button class="filter-pill" data-filter="activo" onclick="filterTickets('activo',this)">Activos</button>
+          <button class="filter-pill" data-filter="usado" onclick="filterTickets('usado',this)">Usados</button>
+          <button class="filter-pill" data-filter="cancelado" onclick="filterTickets('cancelado',this)">Cancelados</button>
+          <div style="margin-left:auto;font-size:13px;color:var(--smoke)" id="ticketCount"></div>
+        </div>
+
+        <div id="ticketList"></div>
+      </div>
+
+      <!-- ── TAB: RECOMENDADOS ── -->
+      <div id="tab-recomendados" style="display:none">
+        <div style="margin-bottom:var(--s6)">
+          <div class="section-eyebrow">Basado en tus gustos</div>
+          <h2 style="font-family:var(--font-display);font-size:1.8rem;color:var(--cream)">Películas para ti</h2>
+          <p style="color:var(--smoke);font-size:14px;margin-top:var(--s2)">Seleccionadas de nuestra cartelera actual</p>
+        </div>
+        <div class="rec-grid" id="recGrid">
+          <p style="color:var(--smoke);grid-column:1/-1">Cargando…</p>
+        </div>
+      </div>
+
+      <!-- ── TAB: CUENTA ── -->
+      <div id="tab-cuenta" style="display:none">
+        <div class="grid-2" style="gap:var(--s6)">
+          <div>
+            <div style="background:var(--ink-2);border:1px solid rgba(255,255,255,.05);border-radius:var(--r3);padding:var(--s6)">
+              <h3 style="font-family:var(--font-display);font-size:1.2rem;color:var(--cream);margin-bottom:var(--s5)">Información de cuenta</h3>
+              <div style="display:flex;flex-direction:column;gap:var(--s4)">
+                <div style="display:flex;justify-content:space-between;padding-bottom:var(--s4);border-bottom:1px solid rgba(255,255,255,.04)">
+                  <span style="font-size:13px;color:var(--smoke)">Nombre</span>
+                  <span style="font-size:13px;color:var(--cream);font-weight:600" id="infoNombre">—</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding-bottom:var(--s4);border-bottom:1px solid rgba(255,255,255,.04)">
+                  <span style="font-size:13px;color:var(--smoke)">Email</span>
+                  <span style="font-size:13px;color:var(--cream);font-weight:600" id="infoEmail">—</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding-bottom:var(--s4);border-bottom:1px solid rgba(255,255,255,.04)">
+                  <span style="font-size:13px;color:var(--smoke)">Rol</span>
+                  <span class="badge badge-activo">Cliente</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="font-size:13px;color:var(--smoke)">Miembro desde</span>
+                  <span style="font-size:13px;color:var(--cream);font-weight:600" id="infoFecha">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="background:var(--ink-2);border:1px solid rgba(255,255,255,.05);border-radius:var(--r3);padding:var(--s6);margin-bottom:var(--s4)">
+              <h3 style="font-family:var(--font-display);font-size:1.2rem;color:var(--cream);margin-bottom:var(--s4)">Cambiar contraseña</h3>
+              <p style="color:var(--smoke);font-size:13px;margin-bottom:var(--s5)">Usa el enlace de recuperación para cambiar tu contraseña de forma segura.</p>
+              <a href="/pages/recuperar.html" class="btn btn-outline btn-sm">Cambiar contraseña</a>
+            </div>
+            <div style="background:rgba(224,85,85,.06);border:1px solid rgba(224,85,85,.15);border-radius:var(--r3);padding:var(--s5)">
+              <h4 style="font-family:var(--font-display);font-size:1rem;color:var(--danger);margin-bottom:var(--s3)">Zona de peligro</h4>
+              <p style="color:var(--smoke);font-size:13px;margin-bottom:var(--s4)">Cerrar sesión en todos los dispositivos.</p>
+              <button class="btn btn-danger btn-sm" onclick="Auth.logout()">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="qrModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Código QR</div>
+      <button class="modal-close" onclick="document.getElementById('qrModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="qr-modal-content">
+      <p style="color:var(--smoke);font-size:13px;margin-bottom:var(--s2)" id="qrMovieName"></p>
+      <div class="qr-display">
+        <img id="qrModalImg" src="" alt="QR Code">
+      </div>
+      <p style="font-family:var(--font-mono);font-size:14px;color:var(--ember);letter-spacing:.1em;margin-bottom:var(--s3)" id="qrModalCode"></p>
+      <p style="color:var(--smoke);font-size:12px">Presenta este código en la entrada de la sala.</p>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+if(!Auth.isLogged()) location.href='/pages/login.html?redirect='+encodeURIComponent(location.href);
+if(Auth.isAdmin()) location.href='/pages/admin/dashboard.html';
+renderNavbar('tiquetes'); renderLoader();
+
+const user = Auth.getUser();
+let allTickets = [], allMovies = [];
+
+async function init() {
+  showLoader();
+
+  // Set user info
+  document.getElementById('profileAvatar').textContent = user.nombre[0].toUpperCase();
+  document.getElementById('profileName').textContent   = user.nombre;
+  document.getElementById('profileEmail').textContent  = user.email;
+  document.getElementById('infoNombre').textContent    = user.nombre;
+  document.getElementById('infoEmail').textContent     = user.email;
+  document.getElementById('memberSince').textContent   = '✓ Miembro activo';
+
+  try {
+    const [tRes, pRes] = await Promise.all([
+      get('/tiquetes/mis-tiquetes', true),
+      get('/peliculas?activas=1')
+    ]);
+    allTickets = tRes.data || [];
+    allMovies  = pRes.data || [];
+    buildStats();
+    renderTickets(allTickets);
+    renderRecomendados();
+    // Load seats for each ticket
+    loadAllSeats(allTickets);
+  } catch(e) { toast('Error al cargar datos', 'error'); }
+  finally { hideLoader(); }
+}
+
+function buildStats() {
+  const total    = allTickets.length;
+  const gasto    = allTickets.reduce((s,t) => s + parseFloat(t.total||0), 0);
+  const peliculas= new Set(allTickets.map(t=>t.pelicula)).size;
+  const activos  = allTickets.filter(t=>t.estado==='activo').length;
+  document.getElementById('statTotal').textContent    = total;
+  document.getElementById('statGasto').textContent    = fmtMoney(gasto).replace('$','') + ' COP'.split('').slice(0,2).join('');
+  document.getElementById('statGasto').textContent    = fmtMoney(gasto);
+  document.getElementById('statPeliculas').textContent= peliculas;
+  document.getElementById('statActivos').textContent  = activos;
+  document.getElementById('infoFecha').textContent    = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long'});
+}
+
+function filterTickets(filter, btn) {
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = filter==='all' ? allTickets : allTickets.filter(t=>t.estado===filter);
+  renderTickets(filtered);
+}
+
+function renderTickets(list) {
+  const el = document.getElementById('ticketList');
+  document.getElementById('ticketCount').textContent = `${list.length} tiquete${list.length!==1?'s':''}`;
+
+  if(!list.length) {
+    el.innerHTML=`<div class="empty-tickets">
+      <div class="empty-tickets-icon">🎟️</div>
+      <h3 style="font-family:var(--font-display);color:var(--cream);margin-bottom:var(--s3)">Sin tiquetes</h3>
+      <p style="color:var(--smoke);margin-bottom:var(--s5)">Compra tus primeros tiquetes y aparecerán aquí.</p>
+      <a href="/pages/cartelera.html" class="btn btn-primary">Ver cartelera</a></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map((t,i) => `
+    <div class="ticket-enhanced anim-fade-up" style="animation-delay:${i*.05}s">
+      <div class="te-header">
+        <div class="te-strip ${t.estado}"></div>
+        ${t.imagen_url
+          ? `<div class="te-poster-wrap"><img class="te-poster" src="${t.imagen_url}" onerror="posterFallback(this)" alt="${t.pelicula}"></div>`
+          : `<div class="te-poster-ph">🎬</div>`}
+        <div class="te-body">
+          <div class="te-film">${t.pelicula}</div>
+          <div class="te-meta">
+            <span>📍 ${t.sala}</span>
+            <span>·</span>
+            <span>📅 ${fmtDateShort(t.funcion_fecha)}</span>
+            <span>·</span>
+            <span>🕐 ${fmtTime(t.funcion_hora)}</span>
+          </div>
+          <div class="te-code">${t.codigo}</div>
+        </div>
+        <div class="te-right">
+          <span class="badge badge-${t.estado}">${t.estado}</span>
+          <div class="te-total">${fmtMoney(t.total)}</div>
+        </div>
+      </div>
+      <div class="ticket-perf">
+        <div class="perf-dot"></div>
+        <div class="perf-line"></div>
+        <div class="perf-dot" style="margin-left:auto"></div>
+      </div>
+      <div class="te-footer">
+        <span class="te-seats" id="seats-${t.id}">Cargando asientos…</span>
+        <div class="te-actions">
+          ${t.estado==='activo'?`<button class="btn btn-outline btn-sm" onclick="showQR('${t.id}','${t.pelicula}','${t.codigo}')">Ver QR</button>`:''}
+          <a href="/pages/pelicula.html" class="btn btn-ghost btn-sm">Ver película</a>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderRecomendados() {
+  const grid = document.getElementById('recGrid');
+  if(!allMovies.length) { grid.innerHTML='<p style="color:var(--smoke)">No hay películas disponibles.</p>'; return; }
+  grid.innerHTML = allMovies.slice(0,12).map(p=>`
+    <div class="rec-card" onclick="location.href='/pages/pelicula.html?id=${p.id}'">
+      ${p.imagen_url
+        ?`<img class="rec-poster" src="${p.imagen_url}" onerror="posterFallback(this)" alt="${p.titulo}" loading="lazy">`
+        :`<div class="rec-poster-ph">🎬</div>`}
+      <div class="rec-info">
+        <div class="rec-title">${p.titulo}</div>
+        <div class="rec-meta">${p.genero} · ${p.clasificacion}</div>
+      </div>
+    </div>`).join('');
+}
+
+function switchTab(tab, btn) {
+  ['tiquetes','recomendados','cuenta'].forEach(t=>{
+    document.getElementById(`tab-${t}`).style.display = t===tab ? '' : 'none';
+  });
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function loadAllSeats(tickets) {
+  for (const t of tickets) {
+    const el = document.getElementById('seats-' + t.id);
+    if (!el) continue;
+    try {
+      const r = await get('/tiquetes/' + t.id + '/asientos', true);
+      const asientos = r.data || [];
+      if (!asientos.length) {
+        el.textContent = 'Sin asientos registrados';
+      } else {
+        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>'
+          + asientos.map(a => a.fila + a.columna).join(', ');
+      }
+    } catch(e) { 
+      el.textContent = 'Info de asientos no disponible';
+    }
+  }
+}
+
+function showQR(id, pelicula, codigo) {
+  document.getElementById('qrMovieName').textContent = pelicula;
+  document.getElementById('qrModalCode').textContent = codigo;
+  // Generate QR locally using a free API
+  document.getElementById('qrModalImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(codigo)}&bgcolor=ffffff&color=0c0c0e&margin=0`;
+  document.getElementById('qrModal').classList.add('open');
+}
+
+init();
+</script>
+</body>
+</html>

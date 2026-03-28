@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Usuarios — Admin Lumina Films</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .admin-layout{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 72px)}
+    .admin-sidebar{background:var(--ink-1);border-right:1px solid rgba(255,255,255,.04);position:sticky;top:72px;height:calc(100vh - 72px);overflow-y:auto;display:flex;flex-direction:column}
+    .sb-brand{padding:var(--s5) var(--s5) var(--s4);border-bottom:1px solid rgba(255,255,255,.04)}
+    .sb-brand-sub{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--smoke);margin-top:4px}
+    .sb-admin-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.2);font-size:10px;font-weight:700;color:var(--ember);margin-top:var(--s3)}
+    .sb-nav{flex:1;padding:var(--s4) 0}
+    .sb-section{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-4);padding:0 var(--s5);margin:var(--s5) 0 var(--s2)}
+    .sb-link{display:flex;align-items:center;gap:var(--s3);padding:10px var(--s5);color:var(--smoke);font-size:13px;font-weight:600;border-left:2px solid transparent;cursor:pointer;text-decoration:none;transition:all var(--t2) var(--ease)}
+    .sb-link:hover{color:var(--mist);background:rgba(255,255,255,.02)}
+    .sb-link.active{color:var(--cream);background:var(--ember-pale);border-left-color:var(--ember)}
+    .sb-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sb-user{border-top:1px solid rgba(255,255,255,.04);padding:var(--s4) var(--s5);display:flex;align-items:center;gap:var(--s3)}
+    .sb-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--ember-dim),var(--ember));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--ink);flex-shrink:0}
+    .sb-uname{font-size:13px;font-weight:600;color:var(--cream)}
+    .sb-urole{font-size:11px;color:var(--smoke)}
+    .admin-content{padding:var(--s7) var(--s7) var(--s9);overflow-x:hidden}
+    .user-table{width:100%;border-collapse:collapse}
+    .user-table th{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--smoke);padding:var(--s3) var(--s4);text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+    .user-table td{padding:var(--s4);border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+    .user-table tr:last-child td{border:none}
+    .user-table tr:hover td{background:rgba(255,255,255,.02)}
+    .user-avatar-sm{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,rgba(91,155,213,.3),rgba(91,155,213,.6));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--cream);flex-shrink:0}
+    .stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:var(--s6)}
+    .stat-card{background:var(--ink-2);border:1px solid rgba(255,255,255,.05);border-radius:var(--r3);padding:var(--s5);display:flex;align-items:center;gap:var(--s4)}
+    .stat-card-icon{width:44px;height:44px;border-radius:var(--r2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .stat-card-num{font-family:var(--font-display);font-size:1.8rem;color:var(--cream);font-weight:700;line-height:1}
+    .stat-card-lbl{font-size:11px;color:var(--smoke);margin-top:3px}
+    .search-box{position:relative;max-width:340px}
+    .search-box input{width:100%;padding:10px 16px 10px 40px;background:var(--ink-2);border:1px solid rgba(255,255,255,.08);border-radius:var(--r2);color:var(--cream);font-size:13px;outline:none;transition:border-color var(--t2) var(--ease)}
+    .search-box input:focus{border-color:var(--ember-dim)}
+    .search-box svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none}
+    @media(max-width:900px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{display:none}.stat-cards{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="admin-layout">
+    <aside class="admin-sidebar"></aside>
+    <div class="admin-content">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--s6);flex-wrap:wrap;gap:var(--s4)">
+        <div>
+          <p class="section-eyebrow">Gestión</p>
+          <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--cream)">Usuarios registrados</h2>
+          <p style="color:var(--smoke);font-size:14px;margin-top:var(--s2)" id="userCount">Cargando…</p>
+        </div>
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--smoke)"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" id="searchInput" placeholder="Buscar usuario…" oninput="filterUsers()">
+        </div>
+      </div>
+
+      <div class="stat-cards" id="statCards">
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background:rgba(91,155,213,.12)"><svg width="22" height="22" viewBox="0 0 24 24" fill="#5b9bd5"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+          <div><div class="stat-card-num" id="scTotal">—</div><div class="stat-card-lbl">Total usuarios</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background:rgba(76,175,130,.12)"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4caf82"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+          <div><div class="stat-card-num" id="scClientes">—</div><div class="stat-card-lbl">Clientes</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background:rgba(212,168,67,.12)"><svg width="22" height="22" viewBox="0 0 24 24" fill="#d4a843"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></div>
+          <div><div class="stat-card-num" id="scAdmins">—</div><div class="stat-card-lbl">Administradores</div></div>
+        </div>
+      </div>
+
+      <div style="background:var(--ink-2);border:1px solid rgba(255,255,255,.05);border-radius:var(--r3);overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Registrado</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody">
+              <tr><td colspan="5" style="text-align:center;padding:var(--s7);color:var(--smoke)">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/js/api.js"></script>
+<script>
+if(!Auth.isLogged()||!Auth.isAdmin()) location.href='/pages/login.html';
+renderNavbar('admin'); renderLoader();
+renderAdminSidebar('usuarios');
+
+let allUsers=[];
+
+async function loadUsers(){
+  showLoader();
+  try{
+    const r=await get('/auth/usuarios',true);
+    allUsers=r.data||[];
+    renderStats();
+    renderTable(allUsers);
+    document.getElementById('userCount').textContent=`${allUsers.length} usuario${allUsers.length!==1?'s':''} registrado${allUsers.length!==1?'s':''}`;
+  }catch(e){toast('Error al cargar usuarios','error');}
+  finally{hideLoader();}
+}
+
+function renderStats(){
+  const clientes=allUsers.filter(u=>u.rol==='cliente').length;
+  const admins=allUsers.filter(u=>u.rol==='admin').length;
+  document.getElementById('scTotal').textContent=allUsers.length;
+  document.getElementById('scClientes').textContent=clientes;
+  document.getElementById('scAdmins').textContent=admins;
+}
+
+function filterUsers(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const filtered=q?allUsers.filter(u=>u.nombre.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)):allUsers;
+  renderTable(filtered);
+}
+
+function renderTable(list){
+  const tbody=document.getElementById('userTableBody');
+  if(!list.length){
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:var(--s7);color:var(--smoke)">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:var(--s3)">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="#2e2e35"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        No se encontraron usuarios
+      </div>
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML=list.map((u,i)=>{
+    const initials=u.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    const isAdmin=u.rol==='admin';
+    const avatarBg=isAdmin?'background:linear-gradient(135deg,rgba(212,168,67,.3),rgba(212,168,67,.6))':'background:linear-gradient(135deg,rgba(91,155,213,.3),rgba(91,155,213,.6))';
+    return `<tr>
+      <td style="color:var(--smoke);font-size:12px;font-weight:600">${i+1}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:var(--s3)">
+          <div class="user-avatar-sm" style="${avatarBg}">${initials}</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--cream)">${u.nombre}</div>
+            <div style="font-size:11px;color:var(--smoke)">ID #${u.id}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:13px;color:var(--mist)">${u.email}</td>
+      <td>
+        <span class="badge" style="${isAdmin?'background:rgba(212,168,67,.12);color:var(--ember);border:1px solid rgba(212,168,67,.2)':'background:rgba(91,155,213,.12);color:var(--info);border:1px solid rgba(91,155,213,.2)'}">
+          ${isAdmin?'Admin':'Cliente'}
+        </span>
+      </td>
+      <td style="font-size:12px;color:var(--smoke)">${fmtDateShort(u.fecha_creacion?.split('T')[0]||u.fecha_creacion)}</td>
+    </tr>`;
+  }).join('');
+}
+
+loadUsers();
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Cartelera — Lumina Films</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .page-hero{padding:var(--s9) 0 var(--s7);background:linear-gradient(180deg,var(--ink-1) 0%,var(--ink) 100%);border-bottom:1px solid rgba(255,255,255,.04)}
+    .search-bar{position:relative;margin-top:var(--s6);max-width:520px}
+    .search-bar input{width:100%;padding:14px 20px 14px 48px;background:var(--ink-2);border:1px solid var(--ink-4);border-radius:100px;color:var(--cream);font-family:var(--font-body);font-size:14px;outline:none;transition:all var(--t2) var(--ease)}
+    .search-bar input:focus{border-color:var(--ember-dim);box-shadow:0 0 0 3px var(--ember-pale)}
+    .search-bar input::placeholder{color:var(--smoke)}
+    .search-icon{position:absolute;left:18px;top:50%;transform:translateY(-50%);color:var(--smoke);font-size:16px;pointer-events:none}
+    .empty-state{grid-column:1/-1;text-align:center;padding:var(--s9) 0}
+    .empty-icon{font-size:3rem;margin-bottom:var(--s4);display:block}
+  </style>
+</head>
+<body>
+<main>
+  <div class="page-hero">
+    <div class="container">
+      <p class="section-eyebrow anim-fade-up">Lumina Films</p>
+      <h1 class="anim-fade-up delay-1">Cartelera</h1>
+      <p style="color:var(--smoke);margin-top:var(--s3)" class="anim-fade-up delay-2">Todas las películas disponibles hoy</p>
+      <div class="search-bar anim-fade-up delay-3">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Buscar película...">
+      </div>
+    </div>
+  </div>
+
+  <section style="padding:var(--s7) 0 var(--s9)" class="container">
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-pill active" data-genre="all">Todos</button>
+    </div>
+    <div class="grid-movies" id="movieGrid"></div>
+  </section>
+</main>
+
+<script src="/js/api.js"></script>
+<script>
+renderNavbar('cartelera'); renderFooter(); renderLoader();
+let allMovies=[], filtered=[];
+
+async function init(){
+  showLoader();
+  try{
+    const r=await get('/peliculas?activas=1');
+    allMovies=r.data||[];
+    buildFilters();
+    applyFilter('all','');
+  }catch(e){toast('Error al cargar películas','error');}
+  finally{hideLoader();}
+}
+
+function buildFilters(){
+  const genres=[...new Set(allMovies.map(m=>m.genero))];
+  const bar=document.getElementById('filterBar');
+  genres.forEach(g=>{
+    const b=document.createElement('button');
+    b.className='filter-pill'; b.dataset.genre=g; b.textContent=g;
+    bar.appendChild(b);
+  });
+  bar.addEventListener('click',e=>{
+    const b=e.target.closest('.filter-pill'); if(!b) return;
+    bar.querySelectorAll('.filter-pill').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    applyFilter(b.dataset.genre, document.getElementById('searchInput').value);
+  });
+}
+
+function applyFilter(genre,q=''){
+  filtered=allMovies.filter(m=>{
+    const matchG=genre==='all'||m.genero===genre;
+    const matchQ=!q||m.titulo.toLowerCase().includes(q.toLowerCase());
+    return matchG&&matchQ;
+  });
+  renderGrid(filtered);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('searchInput').addEventListener('input',e=>{
+    const active=document.querySelector('.filter-pill.active');
+    applyFilter(active?.dataset.genre||'all', e.target.value);
+  });
+});
+
+function renderGrid(list){
+  const g=document.getElementById('movieGrid');
+  if(!list.length){
+    g.innerHTML=`<div class="empty-state"><span class="empty-icon">🎬</span><p style="color:var(--smoke);font-size:1.1rem">No se encontraron películas</p></div>`;
+    return;
+  }
+  g.innerHTML=list.map((p,i)=>`
+    <div class="movie-card anim-fade-up" style="animation-delay:${i*.05}s" onclick="location.href='/pages/pelicula.html?id=${p.id}'">
+      <div class="poster-wrap">
+        <img src="${p.imagen_url||''}" onerror="posterFallback(this)" alt="${p.titulo}" loading="lazy">
+        <div class="genre-badge">${p.genero}</div>
+        <div class="age-badge">${p.clasificacion}</div>
+        <div class="poster-overlay">
+          <div class="play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+          <div style="font-family:var(--font-display);font-size:.9rem;color:var(--cream);font-weight:600">${p.titulo}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="movie-title">${p.titulo}</div>
+        <div class="movie-meta-row">
+          <span>${p.genero}</span><span class="meta-dot"></span><span>${p.duracion} min</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+init();
+</script>
+</body>
+</html>
