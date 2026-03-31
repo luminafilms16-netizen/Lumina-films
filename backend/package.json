@@ -18,6 +18,7 @@
     "nodemailer": "^8.0.4",
     "qrcode": "^1.5.3",
     "sharp": "^0.34.5",
+    "undici-types": "^7.24.6",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
