@@ -88,29 +88,31 @@ exports.comprar = async (req, res) => {
     // Generar QR con el código
     const qrDataUrl = await QRCode.toDataURL(codigo, { width: 200, margin: 1 });
 
-    // Enviar correo si hay usuario con email
+    // Enviar correo en segundo plano (no bloquea la respuesta)
     if (usuario_id) {
-      try {
-        const [userRows] = await db.query('SELECT nombre, email FROM usuarios WHERE id = ?', [usuario_id]);
-        if (userRows.length) {
-          const fechaStr = new Date(funcion.fecha).toLocaleDateString('es-CO', { dateStyle: 'long' });
-          await sendTicketConfirmation(userRows[0].email, {
-            nombre:    userRows[0].nombre,
-            codigo,
-            pelicula:  funcion.pelicula,
-            sala:      funcion.sala_nombre,
-            fecha:     fechaStr,
-            hora:      funcion.hora,
-            asientos:  asientosRows,
-            total,
-            qrDataUrl
-          });
-        }
-      } catch (mailErr) {
-        console.warn('⚠️  Correo no enviado:', mailErr.message);
-      }
+      db.query('SELECT nombre, email FROM usuarios WHERE id = ?', [usuario_id])
+        .then(([userRows]) => {
+          if (userRows.length) {
+            const fechaStr = new Date(funcion.fecha).toLocaleDateString('es-CO', { dateStyle: 'long' });
+            sendTicketConfirmation(userRows[0].email, {
+              nombre:   userRows[0].nombre,
+              codigo,
+              pelicula: funcion.pelicula,
+              sala:     funcion.sala_nombre,
+              fecha:    fechaStr,
+              hora:     funcion.hora,
+              asientos: asientosRows,
+              total,
+              qrDataUrl
+            }).catch(mailErr => {
+              console.warn('⚠️  Correo no enviado:', mailErr.message);
+            });
+          }
+        })
+        .catch(err => console.warn('⚠️  Error obteniendo usuario para correo:', err.message));
     }
 
+    // Responde inmediatamente sin esperar el correo
     res.status(201).json({
       ok: true,
       message: 'Compra realizada exitosamente',
