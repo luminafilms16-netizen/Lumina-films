@@ -50,22 +50,40 @@ function hideLoader() { document.getElementById('loader')?.classList.remove('act
 
 /* ── SVG Logo ── */
 function getLuminaLogo(size = 28) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:block">
-    <circle cx="20" cy="20" r="18" stroke="#d4a843" stroke-width="1.5" fill="none"/>
-    <circle cx="20" cy="20" r="10" fill="#d4a843" opacity="0.12"/>
-    <circle cx="20" cy="20" r="4.5" fill="#d4a843"/>
-    <rect x="2.5" y="8" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="2.5" y="14.5" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="2.5" y="21" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="2.5" y="27.5" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="33" y="8" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="33" y="14.5" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="33" y="21" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <rect x="33" y="27.5" width="4.5" height="3.5" rx="1" fill="#d4a843" opacity="0.65"/>
-    <line x1="20" y1="3" x2="20" y2="11" stroke="#d4a843" stroke-width="1.2" opacity="0.4"/>
-    <line x1="20" y1="29" x2="20" y2="37" stroke="#d4a843" stroke-width="1.2" opacity="0.4"/>
-    <line x1="3" y1="20" x2="11" y2="20" stroke="#d4a843" stroke-width="1.2" opacity="0.4"/>
-    <line x1="29" y1="20" x2="37" y2="20" stroke="#d4a843" stroke-width="1.2" opacity="0.4"/>
+  // Cinematic film-reel / projector lens logo
+  return `<svg width="${size}" height="${size}" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:block">
+    <defs>
+      <radialGradient id="lg1" cx="50%" cy="40%" r="55%">
+        <stop offset="0%" stop-color="#f0cc6e"/>
+        <stop offset="100%" stop-color="#b8872a"/>
+      </radialGradient>
+      <radialGradient id="lg2" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#1a1400"/>
+        <stop offset="100%" stop-color="#0a0a0a"/>
+      </radialGradient>
+    </defs>
+    <!-- Outer ring -->
+    <circle cx="22" cy="22" r="21" fill="url(#lg2)" stroke="url(#lg1)" stroke-width="1.5"/>
+    <!-- Film sprocket holes (top + bottom strip) -->
+    <rect x="4" y="5" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="12" y="5" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="20" y="5" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="28" y="5" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="36" y="5" width="5" height="4" rx="1" fill="#d4a843" opacity="0.35"/>
+    <rect x="4" y="35" width="5" height="4" rx="1" fill="#d4a843" opacity="0.35"/>
+    <rect x="12" y="35" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="20" y="35" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="28" y="35" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <rect x="36" y="35" width="5" height="4" rx="1" fill="#d4a843" opacity="0.7"/>
+    <!-- Lens glow ring -->
+    <circle cx="22" cy="22" r="11" fill="none" stroke="#d4a843" stroke-width="1" opacity="0.3"/>
+    <!-- Lens body -->
+    <circle cx="22" cy="22" r="8.5" fill="url(#lg1)" opacity="0.92"/>
+    <!-- Inner lens reflection -->
+    <circle cx="22" cy="22" r="5.5" fill="#0a0800" opacity="0.85"/>
+    <circle cx="19.5" cy="19.5" r="1.5" fill="#fff" opacity="0.18"/>
+    <!-- Play triangle (cinema projector beam) -->
+    <polygon points="19.5,18.5 19.5,25.5 26,22" fill="#d4a843" opacity="0.9"/>
   </svg>`;
 }
 
