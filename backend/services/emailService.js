@@ -1,35 +1,101 @@
-const { Resend } = require('resend');
-const QRCode     = require('qrcode');
+/**
+ * emailService.js – Lumina Films
+ *
+ * Soporta dos proveedores según las variables de entorno:
+ *   • Resend  → define RESEND_API_KEY
+ *   • SMTP    → define SMTP_HOST + SMTP_USER + SMTP_PASS  (Nodemailer)
+ *
+ * Si ninguno está configurado, lanza un error explícito al arrancar.
+ */
+
+const QRCode = require('qrcode');
 const { createCanvas, loadImage } = require('canvas');
 require('dotenv').config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// ─── Selección de transporte ──────────────────────────────────────────────────
 
-/**
- * Genera un PNG del ticket usando canvas.
- */
+let sendMail; // función unificada: sendMail({ from, to, subject, html, attachments })
+
+if (process.env.RESEND_API_KEY) {
+  // ── Resend ──────────────────────────────────────────────────────────────────
+  const { Resend } = require('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  sendMail = async ({ from, to, subject, html, attachments = [] }) => {
+    const result = await resend.emails.send({ from, to, subject, html, attachments });
+    // Resend devuelve { data, error }
+    if (result.error) throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
+    return result;
+  };
+
+  console.log('📧  Email provider: Resend');
+
+} else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  // ── Nodemailer / SMTP ───────────────────────────────────────────────────────
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host:   process.env.SMTP_HOST,
+    port:   Number(process.env.SMTP_PORT) || 587,
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  sendMail = async ({ from, to, subject, html, attachments = [] }) => {
+    // Nodemailer espera attachments con { filename, content (Buffer|string), encoding }
+    const nmAttachments = attachments.map(a => ({
+      filename: a.filename,
+      content:  Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content, 'base64'),
+    }));
+    return transporter.sendMail({ from, to, subject, html, attachments: nmAttachments });
+  };
+
+  console.log('📧  Email provider: SMTP Nodemailer');
+
+} else {
+  // ── Sin configuración ───────────────────────────────────────────────────────
+  console.warn('⚠️  EMAIL NO CONFIGURADO: define RESEND_API_KEY o SMTP_HOST+SMTP_USER+SMTP_PASS en las variables de entorno.');
+  sendMail = async () => { throw new Error('Servicio de email no configurado.'); };
+}
+
+// ─── Helper: normalizar hora ──────────────────────────────────────────────────
+// MySQL TIME puede llegar como objeto { hours, minutes, seconds } dependiendo del driver.
+function formatHora(hora) {
+  if (!hora) return '';
+  if (typeof hora === 'string') return hora.substring(0, 5); // "HH:MM:SS" → "HH:MM"
+  // Objeto del driver mysql2
+  if (typeof hora === 'object') {
+    const h = String(hora.hours   ?? hora.h ?? 0).padStart(2, '0');
+    const m = String(hora.minutes ?? hora.m ?? 0).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return String(hora);
+}
+
+// ─── Generación del ticket PNG ────────────────────────────────────────────────
 async function generateTicketPNG(ticketData) {
-  const { nombre, codigo, pelicula, sala, fecha, hora, asientos, total } = ticketData;
+  const { nombre, codigo, pelicula, sala, fecha, total, asientos } = ticketData;
+  const hora = formatHora(ticketData.hora);
 
   const W = 520, H = 580;
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
-  // ── Fondo ──────────────────────────────────────────────────
+  // Fondo
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
   bgGrad.addColorStop(0, '#181510');
   bgGrad.addColorStop(1, '#0e0c09');
   ctx.fillStyle = bgGrad;
-  roundRect(ctx, 0, 0, W, H, 16);
-  ctx.fill();
+  roundRect(ctx, 0, 0, W, H, 16); ctx.fill();
 
   // Borde dorado
   ctx.strokeStyle = 'rgba(200,169,110,0.25)';
   ctx.lineWidth = 1.5;
-  roundRect(ctx, 0, 0, W, H, 16);
-  ctx.stroke();
+  roundRect(ctx, 0, 0, W, H, 16); ctx.stroke();
 
-  // ── Header dorado ──────────────────────────────────────────
+  // Header dorado
   const hdrGrad = ctx.createLinearGradient(0, 0, W, 0);
   hdrGrad.addColorStop(0,   '#c8a96e');
   hdrGrad.addColorStop(0.5, '#e8c97e');
@@ -37,18 +103,12 @@ async function generateTicketPNG(ticketData) {
   ctx.fillStyle = hdrGrad;
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(16, 0);
-  ctx.lineTo(W - 16, 0);
+  ctx.moveTo(16, 0); ctx.lineTo(W - 16, 0);
   ctx.quadraticCurveTo(W, 0, W, 16);
-  ctx.lineTo(W, 80);
-  ctx.lineTo(0, 80);
-  ctx.lineTo(0, 16);
+  ctx.lineTo(W, 80); ctx.lineTo(0, 80); ctx.lineTo(0, 16);
   ctx.quadraticCurveTo(0, 0, 16, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  ctx.closePath(); ctx.fill(); ctx.restore();
 
-  // Texto header
   ctx.fillStyle = '#0a0800';
   ctx.font = 'bold 22px Arial';
   ctx.fillText('LUMINA FILMS', 32, 46);
@@ -56,130 +116,87 @@ async function generateTicketPNG(ticketData) {
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillText('CINEMA EXPERIENCE', 32, 62);
 
-  // Badge E-TICKET
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  roundRect(ctx, W - 120, 24, 88, 24, 12);
-  ctx.fill();
+  roundRect(ctx, W - 120, 24, 88, 24, 12); ctx.fill();
   ctx.fillStyle = '#0a0800';
   ctx.font = 'bold 10px Arial';
   ctx.textAlign = 'center';
   ctx.fillText('E-TICKET', W - 76, 40);
   ctx.textAlign = 'left';
 
-  // ── Sección película ───────────────────────────────────────
+  // Sección película
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(0, 80, W, 72);
-
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 19px Arial';
   const tituloText = pelicula.length > 38 ? pelicula.substring(0, 38) + '…' : pelicula;
   ctx.fillText(tituloText, 32, 116);
-
   ctx.fillStyle = '#c8a96e';
   ctx.font = 'bold 11px Arial';
   ctx.fillText(`ENTRADA CONFIRMADA  ·  ${asientos.length} ${asientos.length === 1 ? 'ASIENTO' : 'ASIENTOS'}`, 32, 138);
 
-  // Línea divisora
   ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
   ctx.beginPath(); ctx.moveTo(0, 152); ctx.lineTo(W, 152); ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── Datos ──────────────────────────────────────────────────
+  // Datos
   const drawField = (label, value, x, y) => {
-    ctx.fillStyle = '#555555';
-    ctx.font = 'bold 10px Arial';
-    ctx.fillText(label, x, y);
-    ctx.fillStyle = '#dddddd';
-    ctx.font = '600 14px Arial';
-    ctx.fillText(value, x, y + 18);
+    ctx.fillStyle = '#555555'; ctx.font = 'bold 10px Arial'; ctx.fillText(label, x, y);
+    ctx.fillStyle = '#dddddd'; ctx.font = '600 14px Arial'; ctx.fillText(value, x, y + 18);
   };
-
   drawField('SALA',      sala,  32,  188);
   drawField('FECHA',     fecha, 200, 188);
   drawField('HORA',      hora,  32,  242);
   drawField('COMPRADOR', nombre.length > 22 ? nombre.substring(0, 22) + '…' : nombre, 200, 242);
 
-  // ── Asientos ───────────────────────────────────────────────
-  ctx.fillStyle = '#555555';
-  ctx.font = 'bold 10px Arial';
-  ctx.fillText('ASIENTOS', 32, 376);
-
+  // Asientos
+  ctx.fillStyle = '#555555'; ctx.font = 'bold 10px Arial'; ctx.fillText('ASIENTOS', 32, 376);
   let sx = 32;
   asientos.forEach(a => {
     const label = `${a.fila}${a.columna}`;
     const bw = label.length * 9 + 16;
     ctx.fillStyle = 'rgba(200,169,110,0.12)';
-    roundRect(ctx, sx, 382, bw, 22, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#c8a96e';
-    ctx.lineWidth = 0.8;
-    roundRect(ctx, sx, 382, bw, 22, 4);
-    ctx.stroke();
-    ctx.fillStyle = '#c8a96e';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, sx + bw / 2, 396);
-    ctx.textAlign = 'left';
+    roundRect(ctx, sx, 382, bw, 22, 4); ctx.fill();
+    ctx.strokeStyle = '#c8a96e'; ctx.lineWidth = 0.8;
+    roundRect(ctx, sx, 382, bw, 22, 4); ctx.stroke();
+    ctx.fillStyle = '#c8a96e'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(label, sx + bw / 2, 396); ctx.textAlign = 'left';
     sx += bw + 6;
   });
 
-  // ── Separador con muescas ──────────────────────────────────
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath(); ctx.moveTo(0, 428); ctx.lineTo(W, 428); ctx.stroke();
-  ctx.setLineDash([]);
-
+  // Separador
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(0, 428); ctx.lineTo(W, 428); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath(); ctx.arc(-1, 428, 14, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(W + 1, 428, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0, 428, W, H - 428);
 
-  // Fondo zona QR
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(0, 428, W, H - 428);
-
-  // ── QR ─────────────────────────────────────────────────────
+  // QR
   const qrDataUrl = await QRCode.toDataURL(codigo, { width: 160, margin: 1,
     color: { dark: '#000000', light: '#FFFFFF' } });
   const qrImg = await loadImage(qrDataUrl);
   ctx.fillStyle = '#ffffff';
-  roundRect(ctx, W - 198, 440, 166, 126, 8);
-  ctx.fill();
+  roundRect(ctx, W - 198, 440, 166, 126, 8); ctx.fill();
   ctx.drawImage(qrImg, W - 195, 443, 160, 120);
+  ctx.fillStyle = '#444444'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('ESCANEAR EN ENTRADA', W - 115, 577); ctx.textAlign = 'left';
 
-  ctx.fillStyle = '#444444';
-  ctx.font = 'bold 9px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('ESCANEAR EN ENTRADA', W - 115, 577);
-  ctx.textAlign = 'left';
-
-  // ── Código, total, footer ──────────────────────────────────
-  ctx.fillStyle = '#c8a96e';
-  ctx.font = 'bold 11px Arial';
-  ctx.fillText(codigo, 32, 462);
-
-  ctx.fillStyle = '#444444';
-  ctx.font = 'bold 10px Arial';
-  ctx.fillText('TOTAL PAGADO', 32, 490);
-
-  ctx.fillStyle = '#c8a96e';
-  ctx.font = 'bold 22px Arial';
+  // Código, total, footer
+  ctx.fillStyle = '#c8a96e'; ctx.font = 'bold 11px Arial'; ctx.fillText(codigo, 32, 462);
+  ctx.fillStyle = '#444444'; ctx.font = 'bold 10px Arial'; ctx.fillText('TOTAL PAGADO', 32, 490);
+  ctx.fillStyle = '#c8a96e'; ctx.font = 'bold 22px Arial';
   ctx.fillText(`$${Number(total).toLocaleString('es-CO')}`, 32, 516);
-
-  ctx.fillStyle = '#333333';
-  ctx.font = '10px Arial';
+  ctx.fillStyle = '#333333'; ctx.font = '10px Arial';
   ctx.fillText(`Lumina Films © ${new Date().getFullYear()}`, 32, 565);
 
   return canvas.toBuffer('image/png');
 }
 
-// Helper para rectángulos redondeados
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
   ctx.quadraticCurveTo(x + w, y, x + w, y + r);
   ctx.lineTo(x + w, y + h - r);
   ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
@@ -190,10 +207,11 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// ─── Recuperación de contraseña ──────────────────────────────────────────────
+// ─── Recuperación de contraseña ───────────────────────────────────────────────
 async function sendPasswordReset(toEmail, nombre, resetLink) {
-  await resend.emails.send({
-    from:    process.env.EMAIL_FROM || 'Lumina Films <onboarding@resend.dev>',
+  const from = process.env.EMAIL_FROM || 'Lumina Films <onboarding@resend.dev>';
+  await sendMail({
+    from,
     to:      toEmail,
     subject: '🎬 Lumina Films – Recuperación de contraseña',
     html: `
@@ -225,18 +243,21 @@ async function sendPasswordReset(toEmail, nombre, resetLink) {
 
 // ─── Confirmación de compra con ticket PNG adjunto ────────────────────────────
 async function sendTicketConfirmation(toEmail, ticketData) {
-  const { nombre, codigo, pelicula, sala, fecha, hora, asientos, total } = ticketData;
+  const { nombre, codigo, pelicula, sala, fecha, asientos, total } = ticketData;
+  const hora = formatHora(ticketData.hora); // ← normaliza hora de MySQL
 
   const qrBuffer  = await QRCode.toBuffer(codigo, { width: 200, margin: 2,
     color: { dark: '#000000', light: '#FFFFFF' } });
-  const ticketPNG = await generateTicketPNG(ticketData);
+  const ticketPNG = await generateTicketPNG({ ...ticketData, hora });
 
   const asientosHtml = asientos
     .map(a => `<span style="background:#222;border:1px solid #333;padding:4px 10px;border-radius:4px;color:#c8a96e;font-weight:700;margin:2px;display:inline-block;">${a.fila}${a.columna}</span>`)
     .join(' ');
 
-  await resend.emails.send({
-    from:    process.env.EMAIL_FROM || 'Lumina Films <onboarding@resend.dev>',
+  const from = process.env.EMAIL_FROM || 'Lumina Films <onboarding@resend.dev>';
+
+  await sendMail({
+    from,
     to:      toEmail,
     subject: `🎟️ Lumina Films – Tu tiquete para ${pelicula}`,
     html: `
@@ -277,14 +298,8 @@ async function sendTicketConfirmation(toEmail, ticketData) {
       </div>
     </body></html>`,
     attachments: [
-      {
-        filename: `QR-${codigo}.png`,
-        content:  qrBuffer.toString('base64'),
-      },
-      {
-        filename: `Tiquete-${codigo}.png`,
-        content:  ticketPNG.toString('base64'),
-      }
+      { filename: `QR-${codigo}.png`,      content: qrBuffer.toString('base64') },
+      { filename: `Tiquete-${codigo}.png`, content: ticketPNG.toString('base64') },
     ]
   });
 }

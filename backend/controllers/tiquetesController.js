@@ -31,7 +31,6 @@ exports.comprar = async (req, res) => {
     }
     const funcion = funRows[0];
 
-    // Verificar que los asientos pertenecen a la sala correcta y están libres
     const placeholders = asientos_ids.map(() => '?').join(',');
     const [asientosRows] = await conn.query(
       `SELECT a.id, a.fila, a.columna
@@ -45,7 +44,6 @@ exports.comprar = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'Algunos asientos no son válidos para esta sala' });
     }
 
-    // Verificar que no estén ocupados (lock)
     const [ocupados] = await conn.query(
       `SELECT dt.asiento_id FROM detalle_tiquete dt
        JOIN tiquetes t ON t.id = dt.tiquete_id
@@ -63,19 +61,16 @@ exports.comprar = async (req, res) => {
       });
     }
 
-    // Calcular total
     const precio     = parseFloat(funcion.precio);
     const total      = precio * asientos_ids.length;
     const codigo     = `LF-${uuidv4().split('-')[0].toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
-    // Crear tiquete
     const [ticketResult] = await conn.query(
       'INSERT INTO tiquetes (codigo, usuario_id, funcion_id, total, estado) VALUES (?, ?, ?, ?, "activo")',
       [codigo, usuario_id, funcion_id, total]
     );
     const tiquete_id = ticketResult.insertId;
 
-    // Insertar detalles
     for (const asiento_id of asientos_ids) {
       await conn.query(
         'INSERT INTO detalle_tiquete (tiquete_id, asiento_id, precio_unitario) VALUES (?, ?, ?)',
@@ -85,42 +80,51 @@ exports.comprar = async (req, res) => {
 
     await conn.commit();
 
-    // Generar QR con el código
     const qrDataUrl = await QRCode.toDataURL(codigo, { width: 200, margin: 1 });
 
-    // Enviar correo en segundo plano (no bloquea la respuesta)
+    // Enviar correo en segundo plano — ahora con logs detallados
     if (usuario_id) {
       db.query('SELECT nombre, email FROM usuarios WHERE id = ?', [usuario_id])
         .then(([userRows]) => {
-          if (userRows.length) {
-            const fechaStr = new Date(funcion.fecha).toLocaleDateString('es-CO', { dateStyle: 'long' });
-            sendTicketConfirmation(userRows[0].email, {
-              nombre:   userRows[0].nombre,
-              codigo,
-              pelicula: funcion.pelicula,
-              sala:     funcion.sala_nombre,
-              fecha:    fechaStr,
-              hora:     funcion.hora,
-              asientos: asientosRows,
-              total,
-              qrDataUrl
-            }).catch(mailErr => {
-              console.warn('⚠️  Correo no enviado:', mailErr.message);
-            });
+          if (!userRows.length) {
+            console.warn(`⚠️  Usuario ${usuario_id} no encontrado para envío de correo.`);
+            return;
           }
+          const { nombre, email } = userRows[0];
+          // Fecha legible
+          const fechaStr = new Date(funcion.fecha).toLocaleDateString('es-CO', { dateStyle: 'long' });
+
+          console.log(`📧  Enviando tiquete ${codigo} a ${email}...`);
+          sendTicketConfirmation(email, {
+            nombre,
+            codigo,
+            pelicula: funcion.pelicula,
+            sala:     funcion.sala_nombre,
+            fecha:    fechaStr,
+            hora:     funcion.hora,   // emailService.js normaliza el tipo
+            asientos: asientosRows,
+            total,
+            qrDataUrl,
+          })
+            .then(() => console.log(`✅  Correo enviado a ${email} (tiquete ${codigo})`))
+            .catch(mailErr => {
+              // Log completo para Railway Logs
+              console.error(`❌  Error al enviar correo a ${email} (tiquete ${codigo}):`);
+              console.error(mailErr);
+            });
         })
-        .catch(err => console.warn('⚠️  Error obteniendo usuario para correo:', err.message));
+        .catch(err => console.error('❌  Error obteniendo usuario para correo:', err));
     }
 
-    // Responde inmediatamente sin esperar el correo
     res.status(201).json({
       ok: true,
       message: 'Compra realizada exitosamente',
       tiquete: { id: tiquete_id, codigo, total, qr: qrDataUrl }
     });
+
   } catch (err) {
     await conn.rollback();
-    console.error(err);
+    console.error('❌  Error en compra:', err);
     res.status(500).json({ ok: false, message: 'Error al procesar la compra' });
   } finally {
     conn.release();
@@ -155,10 +159,8 @@ exports.validar = async (req, res) => {
     if (tiquete.estado === 'cancelado')
       return res.json({ ok: false, estado: 'invalido', message: 'Este tiquete fue cancelado', tiquete });
 
-    // Marcar como usado
     await db.query('UPDATE tiquetes SET estado = "usado" WHERE id = ?', [tiquete.id]);
 
-    // Obtener asientos del tiquete
     const [asientos] = await db.query(
       `SELECT a.fila, a.columna FROM detalle_tiquete dt
        JOIN asientos a ON a.id = dt.asiento_id
@@ -166,12 +168,7 @@ exports.validar = async (req, res) => {
       [tiquete.id]
     );
 
-    res.json({
-      ok: true,
-      estado: 'valido',
-      message: '✅ Tiquete válido. Acceso permitido.',
-      tiquete: { ...tiquete, asientos }
-    });
+    res.json({ ok: true, estado: 'valido', message: '✅ Tiquete válido. Acceso permitido.', tiquete: { ...tiquete, asientos } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, message: 'Error al validar tiquete' });
