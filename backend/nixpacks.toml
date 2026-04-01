@@ -1,5 +1,5 @@
-[phases.install]
-cmds = ["npm install --no-audit"]
+[phases.setup]
+aptPkgs = ["fontconfig", "fonts-dejavu-core", "librsvg2-dev", "libvips-dev"]
 
-[phases.build]
-cmds = []
+[phases.install]
+cmds = ["npm install --no-audit && npm install --os=linux --cpu=x64 --libc=glibc sharp"]
