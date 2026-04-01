@@ -1,7 +1,8 @@
 /**
  * emailService.js – Lumina Films
  *
- * Soporta dos proveedores según las variables de entorno:
+ * Soporta tres proveedores según las variables de entorno:
+ *   • Brevo   → define BREVO_API_KEY         (recomendado en Railway)
  *   • Resend  → define RESEND_API_KEY
  *   • SMTP    → define SMTP_HOST + SMTP_USER + SMTP_PASS  (Nodemailer)
  *
@@ -16,14 +17,50 @@ require('dotenv').config();
 
 let sendMail; // función unificada: sendMail({ from, to, subject, html, attachments })
 
-if (process.env.RESEND_API_KEY) {
+if (process.env.BREVO_API_KEY) {
+  // ── Brevo API HTTP ──────────────────────────────────────────────────────────
+  sendMail = async ({ from, to, subject, html, attachments = [] }) => {
+    const body = {
+      sender:      { name: 'Lumina Films', email: from.match(/<(.+)>/)?.[1] ?? from },
+      to:          [{ email: to }],
+      subject,
+      htmlContent: html,
+    };
+
+    if (attachments.length) {
+      body.attachment = attachments.map(a => ({
+        name:    a.filename,
+        content: Buffer.isBuffer(a.content)
+          ? a.content.toString('base64')
+          : a.content,
+      }));
+    }
+
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method:  'POST',
+      headers: {
+        'api-key':      process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(`Brevo error: ${JSON.stringify(err)}`);
+    }
+    return res.json();
+  };
+
+  console.log('📧  Email provider: Brevo API');
+
+} else if (process.env.RESEND_API_KEY) {
   // ── Resend ──────────────────────────────────────────────────────────────────
   const { Resend } = require('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   sendMail = async ({ from, to, subject, html, attachments = [] }) => {
     const result = await resend.emails.send({ from, to, subject, html, attachments });
-    // Resend devuelve { data, error }
     if (result.error) throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
     return result;
   };
@@ -44,7 +81,6 @@ if (process.env.RESEND_API_KEY) {
   });
 
   sendMail = async ({ from, to, subject, html, attachments = [] }) => {
-    // Nodemailer espera attachments con { filename, content (Buffer|string), encoding }
     const nmAttachments = attachments.map(a => ({
       filename: a.filename,
       content:  Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content, 'base64'),
@@ -56,16 +92,14 @@ if (process.env.RESEND_API_KEY) {
 
 } else {
   // ── Sin configuración ───────────────────────────────────────────────────────
-  console.warn('⚠️  EMAIL NO CONFIGURADO: define RESEND_API_KEY o SMTP_HOST+SMTP_USER+SMTP_PASS en las variables de entorno.');
+  console.warn('⚠️  EMAIL NO CONFIGURADO: define BREVO_API_KEY, RESEND_API_KEY o SMTP_HOST+SMTP_USER+SMTP_PASS en las variables de entorno.');
   sendMail = async () => { throw new Error('Servicio de email no configurado.'); };
 }
 
 // ─── Helper: normalizar hora ──────────────────────────────────────────────────
-// MySQL TIME puede llegar como objeto { hours, minutes, seconds } dependiendo del driver.
 function formatHora(hora) {
   if (!hora) return '';
-  if (typeof hora === 'string') return hora.substring(0, 5); // "HH:MM:SS" → "HH:MM"
-  // Objeto del driver mysql2
+  if (typeof hora === 'string') return hora.substring(0, 5);
   if (typeof hora === 'object') {
     const h = String(hora.hours   ?? hora.h ?? 0).padStart(2, '0');
     const m = String(hora.minutes ?? hora.m ?? 0).padStart(2, '0');
@@ -244,7 +278,7 @@ async function sendPasswordReset(toEmail, nombre, resetLink) {
 // ─── Confirmación de compra con ticket PNG adjunto ────────────────────────────
 async function sendTicketConfirmation(toEmail, ticketData) {
   const { nombre, codigo, pelicula, sala, fecha, asientos, total } = ticketData;
-  const hora = formatHora(ticketData.hora); // ← normaliza hora de MySQL
+  const hora = formatHora(ticketData.hora);
 
   const qrBuffer  = await QRCode.toBuffer(codigo, { width: 200, margin: 2,
     color: { dark: '#000000', light: '#FFFFFF' } });
