@@ -47,40 +47,71 @@ exports.obtener = async (req, res) => {
   }
 };
 
-// ── Crear función (con validación de traslape) ────────────────
+// ── Helpers de tiempo ─────────────────────────────────────────
+// Convierte "HH:MM" o "HH:MM:SS" a segundos totales del día
+function timeToSec(t) {
+  const parts = String(t).split(':').map(Number);
+  return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+}
+
+// Verifica si dos bloques horarios se traslapan (incluyendo buffer de 15 min = 900 seg)
+// Bloque A: [inicioA, inicioA + duracionA*60 + 900]
+// Bloque B: [inicioB, inicioB + duracionB*60 + 900]
+// Hay traslape si: inicioA < finB  Y  finA > inicioB
+function hayTraslape(inicioA, duracionA, inicioB, duracionB) {
+  const finA = inicioA + duracionA * 60 + 900;
+  const finB = inicioB + duracionB * 60 + 900;
+  return inicioA < finB && finA > inicioB;
+}
+
+// ── Crear función (con validación de traslape y hora futura) ──
 exports.crear = async (req, res) => {
   try {
     const { pelicula_id, sala_id, fecha, hora, precio, estado } = req.body;
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
-    // Obtener duración de la película para calcular fin de función
+    // ── Validación Bug #2: la función debe ser al menos 45 min en el futuro ──
+    // Construimos la fecha+hora de la función y la comparamos con ahora + 45 min
+    const fechaHoraFuncion = new Date(`${fecha}T${hora.length === 5 ? hora + ':00' : hora}`);
+    const ahora = new Date();
+    const minimoFuturo = new Date(ahora.getTime() + 45 * 60 * 1000); // ahora + 45 min
+
+    if (fechaHoraFuncion < minimoFuturo) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+      });
+    }
+
+    // Obtener duración de la película nueva
     const [peliRows] = await db.query('SELECT duracion FROM peliculas WHERE id = ?', [pelicula_id]);
     if (!peliRows.length)
       return res.status(404).json({ ok: false, message: 'Película no encontrada' });
 
-    // Verificar traslape en la misma sala y fecha
-    // Una función A traslapa con B si: A.inicio < B.fin Y A.fin > B.inicio
-    const duracion = peliRows[0].duracion; // minutos
+    const duracionNueva = peliRows[0].duracion; // minutos
+    const inicioNueva   = timeToSec(hora);
 
-    const [traslape] = await db.query(
-      `SELECT f.id, p.titulo AS pelicula, f.hora
+    // ── Validación Bug #1: traslape calculado en JS para evitar inconsistencias SQL ──
+    // Traemos todas las funciones de esa sala y fecha con su duración
+    const [funcionesExistentes] = await db.query(
+      `SELECT f.id, f.hora, p.titulo AS pelicula, p.duracion
        FROM funciones f
        JOIN peliculas p ON p.id = f.pelicula_id
-       WHERE f.sala_id = ? AND f.fecha = ? AND f.estado = 'disponible'
-         AND (
-           TIME_TO_SEC(?) < TIME_TO_SEC(f.hora) + (p.duracion * 60) + 900
-           AND TIME_TO_SEC(?) + (? * 60) + 900 > TIME_TO_SEC(f.hora)
-         )`,
-      [sala_id, fecha, hora, hora, duracion]
+       WHERE f.sala_id = ? AND f.fecha = ? AND f.estado = 'disponible'`,
+      [sala_id, fecha]
     );
 
-    if (traslape.length) {
-      const conflictos = traslape.map(t => `"${t.pelicula}" a las ${t.hora}`).join(', ');
+    const conflictos = funcionesExistentes.filter(f =>
+      hayTraslape(inicioNueva, duracionNueva, timeToSec(f.hora), f.duracion)
+    );
+
+    if (conflictos.length) {
+      const lista = conflictos.map(f => `"${f.pelicula}" a las ${String(f.hora).substring(0, 5)}`).join(', ');
       return res.status(409).json({
         ok: false,
-        message: `Conflicto de horario con: ${conflictos} (incluye 15 min de limpieza)`,
-        conflictos: traslape
+        message: `Conflicto de horario con: ${lista} (incluye 15 min de limpieza)`,
+        conflictos
       });
     }
 
@@ -105,31 +136,44 @@ exports.editar = async (req, res) => {
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
+    // ── Validación: la función editada también debe ser al menos 45 min en el futuro ──
+    const fechaHoraFuncion = new Date(`${fecha}T${hora.length === 5 ? hora + ':00' : hora}`);
+    const ahora = new Date();
+    const minimoFuturo = new Date(ahora.getTime() + 45 * 60 * 1000);
+
+    if (fechaHoraFuncion < minimoFuturo) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+      });
+    }
+
     const [peliRows] = await db.query('SELECT duracion FROM peliculas WHERE id = ?', [pelicula_id]);
     if (!peliRows.length)
       return res.status(404).json({ ok: false, message: 'Película no encontrada' });
 
-    const duracion = peliRows[0].duracion;
+    const duracionNueva = peliRows[0].duracion;
+    const inicioNueva   = timeToSec(hora);
 
-    // Verificar traslape excluyendo la función actual
-    const [traslape] = await db.query(
-      `SELECT f.id, p.titulo AS pelicula, f.hora, f.fecha
+    // ── Traslape calculado en JS, excluyendo la función que se está editando ──
+    const [funcionesExistentes] = await db.query(
+      `SELECT f.id, f.hora, p.titulo AS pelicula, p.duracion
        FROM funciones f
        JOIN peliculas p ON p.id = f.pelicula_id
-       WHERE f.sala_id = ? AND f.fecha = ? AND f.estado = 'disponible' AND f.id != ?
-         AND (
-           TIME_TO_SEC(?) < TIME_TO_SEC(f.hora) + (p.duracion * 60) + 900
-           AND TIME_TO_SEC(?) + (? * 60) + 900 > TIME_TO_SEC(f.hora)
-         )`,
-      [sala_id, fecha, id, hora, hora, duracion]
+       WHERE f.sala_id = ? AND f.fecha = ? AND f.estado = 'disponible' AND f.id != ?`,
+      [sala_id, fecha, id]
     );
 
-    if (traslape.length) {
-      const conflictos = traslape.map(t => `"${t.pelicula}" a las ${t.hora}`).join(', ');
+    const conflictos = funcionesExistentes.filter(f =>
+      hayTraslape(inicioNueva, duracionNueva, timeToSec(f.hora), f.duracion)
+    );
+
+    if (conflictos.length) {
+      const lista = conflictos.map(f => `"${f.pelicula}" a las ${String(f.hora).substring(0, 5)}`).join(', ');
       return res.status(409).json({
         ok: false,
-        message: `Conflicto de horario con: ${conflictos} (incluye 15 min de limpieza)`,
-        conflictos: traslape
+        message: `Conflicto de horario con: ${lista} (incluye 15 min de limpieza)`,
+        conflictos
       });
     }
 

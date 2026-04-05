@@ -250,6 +250,26 @@ function populateSelects(peliculas,salas){
     salas.map(s=>`<option value="${s.id}">${s.nombre} — ${s.capacidad} asientos</option>`).join('');
 }
 
+// Devuelve la hora mínima permitida en formato "HH:MM" (ahora + 45 min)
+function getMinHora(){
+  const d=new Date(Date.now()+45*60*1000);
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+// Actualiza el atributo min del campo hora según si la fecha seleccionada es hoy
+function actualizarMinHora(){
+  const fechaInput=document.getElementById('fecha');
+  const horaInput=document.getElementById('hora');
+  const hoy=new Date().toISOString().split('T')[0];
+  if(fechaInput.value===hoy){
+    horaInput.min=getMinHora();
+    // Si la hora actual ya no cumple el mínimo, la limpiamos
+    if(horaInput.value && horaInput.value < horaInput.min) horaInput.value='';
+  } else {
+    horaInput.min='00:00';
+  }
+}
+
 function openModal(){
   editMode=false;
   document.getElementById('modalTitle').textContent='Nueva Función';
@@ -258,7 +278,10 @@ function openModal(){
   document.getElementById('editId').value='';
   document.getElementById('formAlert').innerHTML='';
   document.getElementById('funcionForm').reset();
-  document.getElementById('fecha').min=new Date().toISOString().split('T')[0];
+  const hoy=new Date().toISOString().split('T')[0];
+  document.getElementById('fecha').min=hoy;
+  document.getElementById('fecha').addEventListener('change',actualizarMinHora);
+  actualizarMinHora();
   document.getElementById('formModal').classList.add('open');
 }
 
@@ -273,10 +296,14 @@ async function openEdit(id){
   document.getElementById('formAlert').innerHTML='';
   document.getElementById('pelicula_id').value=f.pelicula_id;
   document.getElementById('sala_id').value=f.sala_id;
+  const hoy=new Date().toISOString().split('T')[0];
+  document.getElementById('fecha').min=hoy;
   document.getElementById('fecha').value=f.fecha;
+  document.getElementById('fecha').addEventListener('change',actualizarMinHora);
   document.getElementById('hora').value=f.hora;
   document.getElementById('precio').value=f.precio;
   document.getElementById('estado').value=f.estado;
+  actualizarMinHora();
   document.getElementById('formModal').classList.add('open');
 }
 
