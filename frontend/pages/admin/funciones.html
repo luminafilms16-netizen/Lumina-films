@@ -320,7 +320,9 @@ document.getElementById('funcionForm').addEventListener('submit',async e=>{
     fecha:document.getElementById('fecha').value,
     hora:document.getElementById('hora').value,
     precio:document.getElementById('precio').value,
-    estado:document.getElementById('estado').value||'disponible'
+    estado:document.getElementById('estado').value||'disponible',
+    cliente_now:new Date().toISOString(),
+    cliente_offset:new Date().getTimezoneOffset()
   };
   try{
     if(editMode){

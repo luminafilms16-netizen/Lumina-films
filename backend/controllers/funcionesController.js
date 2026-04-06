@@ -55,8 +55,6 @@ function timeToSec(t) {
 }
 
 // Verifica si dos bloques horarios se traslapan (incluyendo buffer de 15 min = 900 seg)
-// Bloque A: [inicioA, inicioA + duracionA*60 + 900]
-// Bloque B: [inicioB, inicioB + duracionB*60 + 900]
 // Hay traslape si: inicioA < finB  Y  finA > inicioB
 function hayTraslape(inicioA, duracionA, inicioB, duracionB) {
   const finA = inicioA + duracionA * 60 + 900;
@@ -64,26 +62,41 @@ function hayTraslape(inicioA, duracionA, inicioB, duracionB) {
   return inicioA < finB && finA > inicioB;
 }
 
+// ── Validación de hora futura ─────────────────────────────────
+// El cliente envía:
+//   cliente_now:    new Date().toISOString()       → hora actual del cliente en UTC
+//   cliente_offset: new Date().getTimezoneOffset() → offset en minutos (ej: 300 para UTC-5)
+// Con ambos valores reconstruimos el timestamp UTC real de la función programada.
+function esFuturaValida(fecha, hora, clienteNow, clienteOffset) {
+  // ahoraUTC: timestamp real del cliente en ms
+  const ahoraUTC = new Date(clienteNow).getTime();
+
+  // La fecha+hora del formulario está en hora LOCAL del cliente.
+  // Date.UTC la interpreta como UTC, así que le sumamos el offset para corregir:
+  // offset en ms (positivo para zonas oeste de UTC, ej: Colombia UTC-5 → offset=300 → +300min)
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  const [h, m]           = hora.split(':').map(Number);
+  const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) + (clienteOffset * 60 * 1000);
+
+  const minimoFuturo = ahoraUTC + 45 * 60 * 1000;
+  return funcionUTC >= minimoFuturo;
+}
+
 // ── Crear función (con validación de traslape y hora futura) ──
 exports.crear = async (req, res) => {
   try {
-    const { pelicula_id, sala_id, fecha, hora, precio, estado } = req.body;
+    const { pelicula_id, sala_id, fecha, hora, precio, estado, cliente_now, cliente_offset } = req.body;
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
-    // ── Validación Bug #2: la función debe ser al menos 45 min en el futuro ──
-    // Se usa el constructor local de Date para evitar desfases por zona horaria UTC
-    const [anio, mes, dia] = fecha.split('-').map(Number);
-    const [h, m] = hora.split(':').map(Number);
-    const fechaHoraFuncion = new Date(anio, mes - 1, dia, h, m, 0);
-    const ahora = new Date();
-    const minimoFuturo = new Date(ahora.getTime() + 45 * 60 * 1000); // ahora + 45 min
-
-    if (fechaHoraFuncion < minimoFuturo) {
-      return res.status(400).json({
-        ok: false,
-        message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
-      });
+    // ── Validación Bug #2: función debe ser al menos 45 min en el futuro ──
+    if (cliente_now && typeof cliente_offset === 'number') {
+      if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
+        return res.status(400).json({
+          ok: false,
+          message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+        });
+      }
     }
 
     // Obtener duración de la película nueva
@@ -94,8 +107,7 @@ exports.crear = async (req, res) => {
     const duracionNueva = peliRows[0].duracion; // minutos
     const inicioNueva   = timeToSec(hora);
 
-    // ── Validación Bug #1: traslape calculado en JS para evitar inconsistencias SQL ──
-    // Traemos todas las funciones de esa sala y fecha con su duración
+    // ── Validación Bug #1: traslape calculado en JS ──
     const [funcionesExistentes] = await db.query(
       `SELECT f.id, f.hora, p.titulo AS pelicula, p.duracion
        FROM funciones f
@@ -134,23 +146,18 @@ exports.crear = async (req, res) => {
 exports.editar = async (req, res) => {
   try {
     const { id } = req.params;
-    const { pelicula_id, sala_id, fecha, hora, precio, estado } = req.body;
+    const { pelicula_id, sala_id, fecha, hora, precio, estado, cliente_now, cliente_offset } = req.body;
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
-    // ── Validación: la función editada también debe ser al menos 45 min en el futuro ──
-    // Se usa el constructor local de Date para evitar desfases por zona horaria UTC
-    const [anio, mes, dia] = fecha.split('-').map(Number);
-    const [h, m] = hora.split(':').map(Number);
-    const fechaHoraFuncion = new Date(anio, mes - 1, dia, h, m, 0);
-    const ahora = new Date();
-    const minimoFuturo = new Date(ahora.getTime() + 45 * 60 * 1000);
-
-    if (fechaHoraFuncion < minimoFuturo) {
-      return res.status(400).json({
-        ok: false,
-        message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
-      });
+    // ── Validación hora futura ──
+    if (cliente_now && typeof cliente_offset === 'number') {
+      if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
+        return res.status(400).json({
+          ok: false,
+          message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+        });
+      }
     }
 
     const [peliRows] = await db.query('SELECT duracion FROM peliculas WHERE id = ?', [pelicula_id]);
