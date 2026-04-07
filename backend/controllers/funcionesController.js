@@ -72,11 +72,12 @@ function esFuturaValida(fecha, hora, clienteNow, clienteOffset) {
   const ahoraUTC = new Date(clienteNow).getTime();
 
   // La fecha+hora del formulario está en hora LOCAL del cliente.
-  // Date.UTC la interpreta como UTC, así que le sumamos el offset para corregir:
-  // offset en ms (positivo para zonas oeste de UTC, ej: Colombia UTC-5 → offset=300 → +300min)
+  // Date.UTC la interpreta como UTC, así que le restamos el offset para corregir:
+  // getTimezoneOffset() devuelve un valor positivo para zonas al oeste de UTC
+  // (ej: Colombia UTC-5 → offset=300), por lo que restarlo convierte hora local a UTC.
   const [anio, mes, dia] = fecha.split('-').map(Number);
   const [h, m]           = hora.split(':').map(Number);
-  const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) + (clienteOffset * 60 * 1000);
+  const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) - (clienteOffset * 60 * 1000);
 
   const minimoFuturo = ahoraUTC + 45 * 60 * 1000;
   return funcionUTC >= minimoFuturo;
