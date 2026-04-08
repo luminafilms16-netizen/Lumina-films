@@ -236,6 +236,9 @@ function renderList(list){
         <button class="btn btn-ghost btn-sm" title="Editar" onclick="openEdit(${f.id})">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         </button>
+        ${isPast ? `<button class="btn btn-ghost btn-sm" title="Eliminar función pasada" onclick="eliminarFuncion(${f.id},'${f.pelicula.replace(/'/g, "\'")}')" style="color:var(--danger);border-color:rgba(224,85,85,.2)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -344,6 +347,17 @@ document.getElementById('funcionForm').addEventListener('submit',async e=>{
     btn.textContent=editMode?'Guardar cambios':'Crear función';
   }
 });
+
+async function eliminarFuncion(id, titulo){
+  if(!confirm(`¿Eliminar la función de "${titulo}"? Esta acción no se puede deshacer.`)) return;
+  try{
+    await del(`/funciones/${id}`,true);
+    toast('Función eliminada correctamente','success');
+    loadAll();
+  }catch(err){
+    toast(err.message||'Error al eliminar la función','error');
+  }
+}
 
 loadAll();
 </script>

@@ -48,14 +48,11 @@ exports.obtener = async (req, res) => {
 };
 
 // ── Helpers de tiempo ─────────────────────────────────────────
-// Convierte "HH:MM" o "HH:MM:SS" a segundos totales del día
 function timeToSec(t) {
   const parts = String(t).split(':').map(Number);
   return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
 }
 
-// Verifica si dos bloques horarios se traslapan (incluyendo buffer de 15 min = 900 seg)
-// Hay traslape si: inicioA < finB  Y  finA > inicioB
 function hayTraslape(inicioA, duracionA, inicioB, duracionB) {
   const finA = inicioA + duracionA * 60 + 900;
   const finB = inicioB + duracionB * 60 + 900;
@@ -63,33 +60,22 @@ function hayTraslape(inicioA, duracionA, inicioB, duracionB) {
 }
 
 // ── Validación de hora futura ─────────────────────────────────
-// El cliente envía:
-//   cliente_now:    new Date().toISOString()       → hora actual del cliente en UTC
-//   cliente_offset: new Date().getTimezoneOffset() → offset en minutos (ej: 300 para UTC-5)
-// Con ambos valores reconstruimos el timestamp UTC real de la función programada.
 function esFuturaValida(fecha, hora, clienteNow, clienteOffset) {
-  // ahoraUTC: timestamp real del cliente en ms
   const ahoraUTC = new Date(clienteNow).getTime();
-
-  // La fecha+hora del formulario está en hora LOCAL del cliente.
-  // Date.UTC la interpreta como UTC, así que le sumamos el offset para corregir:
-  // offset en ms (positivo para zonas oeste de UTC, ej: Colombia UTC-5 → offset=300 → +300min)
   const [anio, mes, dia] = fecha.split('-').map(Number);
   const [h, m]           = hora.split(':').map(Number);
   const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) + (clienteOffset * 60 * 1000);
-
   const minimoFuturo = ahoraUTC + 24 * 60 * 60 * 1000;
   return funcionUTC >= minimoFuturo;
 }
 
-// ── Crear función (con validación de traslape y hora futura) ──
+// ── Crear función ─────────────────────────────────────────────
 exports.crear = async (req, res) => {
   try {
     const { pelicula_id, sala_id, fecha, hora, precio, estado, cliente_now, cliente_offset } = req.body;
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
-    // ── Validación Bug #2: función debe ser al menos 45 min en el futuro ──
     if (cliente_now && typeof cliente_offset === 'number') {
       if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
         return res.status(400).json({
@@ -99,15 +85,13 @@ exports.crear = async (req, res) => {
       }
     }
 
-    // Obtener duración de la película nueva
     const [peliRows] = await db.query('SELECT duracion FROM peliculas WHERE id = ?', [pelicula_id]);
     if (!peliRows.length)
       return res.status(404).json({ ok: false, message: 'Película no encontrada' });
 
-    const duracionNueva = peliRows[0].duracion; // minutos
+    const duracionNueva = peliRows[0].duracion;
     const inicioNueva   = timeToSec(hora);
 
-    // ── Validación Bug #1: traslape calculado en JS ──
     const [funcionesExistentes] = await db.query(
       `SELECT f.id, f.hora, p.titulo AS pelicula, p.duracion
        FROM funciones f
@@ -142,7 +126,7 @@ exports.crear = async (req, res) => {
   }
 };
 
-// ── Editar función (admin) ────────────────────────────────────
+// ── Editar función ────────────────────────────────────────────
 exports.editar = async (req, res) => {
   try {
     const { id } = req.params;
@@ -150,7 +134,6 @@ exports.editar = async (req, res) => {
     if (!pelicula_id || !sala_id || !fecha || !hora || !precio)
       return res.status(400).json({ ok: false, message: 'Faltan campos obligatorios' });
 
-    // ── Validación hora futura ──
     if (cliente_now && typeof cliente_offset === 'number') {
       if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
         return res.status(400).json({
@@ -167,7 +150,6 @@ exports.editar = async (req, res) => {
     const duracionNueva = peliRows[0].duracion;
     const inicioNueva   = timeToSec(hora);
 
-    // ── Traslape calculado en JS, excluyendo la función que se está editando ──
     const [funcionesExistentes] = await db.query(
       `SELECT f.id, f.hora, p.titulo AS pelicula, p.duracion
        FROM funciones f
@@ -217,5 +199,38 @@ exports.listarAdmin = async (req, res) => {
     res.json({ ok: true, data: rows });
   } catch (err) {
     res.status(500).json({ ok: false, message: 'Error al obtener funciones' });
+  }
+};
+
+// ── Eliminar función (admin, solo si es pasada) ───────────────
+exports.eliminar = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await db.query(
+      `SELECT f.fecha, f.hora FROM funciones f WHERE f.id = ?`,
+      [id]
+    );
+    if (!rows.length)
+      return res.status(404).json({ ok: false, message: 'Función no encontrada' });
+
+    const { fecha, hora } = rows[0];
+    const ahora = new Date();
+    const [anio, mes, dia] = String(fecha).substring(0, 10).split('-').map(Number);
+    const [h, m] = String(hora).substring(0, 5).split(':').map(Number);
+    const fechaHoraFuncion = new Date(anio, mes - 1, dia, h, m, 0);
+
+    if (fechaHoraFuncion >= ahora) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Solo se pueden eliminar funciones cuya fecha y hora ya hayan pasado.'
+      });
+    }
+
+    await db.query('DELETE FROM funciones WHERE id = ?', [id]);
+    res.json({ ok: true, message: 'Función eliminada correctamente' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, message: 'Error al eliminar función' });
   }
 };
