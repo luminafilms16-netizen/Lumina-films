@@ -72,14 +72,13 @@ function esFuturaValida(fecha, hora, clienteNow, clienteOffset) {
   const ahoraUTC = new Date(clienteNow).getTime();
 
   // La fecha+hora del formulario está en hora LOCAL del cliente.
-  // Date.UTC la interpreta como UTC, así que le restamos el offset para corregir:
-  // getTimezoneOffset() devuelve positivo para zonas al oeste de UTC
-  // (ej: Colombia UTC-5 → offset=300), restar convierte hora local → UTC.
+  // Date.UTC la interpreta como UTC, así que le sumamos el offset para corregir:
+  // offset en ms (positivo para zonas oeste de UTC, ej: Colombia UTC-5 → offset=300 → +300min)
   const [anio, mes, dia] = fecha.split('-').map(Number);
   const [h, m]           = hora.split(':').map(Number);
-  const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) - (clienteOffset * 60 * 1000);
+  const funcionUTC = Date.UTC(anio, mes - 1, dia, h, m, 0) + (clienteOffset * 60 * 1000);
 
-  const minimoFuturo = ahoraUTC + 45 * 60 * 1000;
+  const minimoFuturo = ahoraUTC + 24 * 60 * 60 * 1000;
   return funcionUTC >= minimoFuturo;
 }
 
@@ -95,7 +94,7 @@ exports.crear = async (req, res) => {
       if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
         return res.status(400).json({
           ok: false,
-          message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+          message: 'La función debe programarse con al menos 24 horas de anticipación respecto a la hora actual.'
         });
       }
     }
@@ -156,7 +155,7 @@ exports.editar = async (req, res) => {
       if (!esFuturaValida(fecha, hora, cliente_now, cliente_offset)) {
         return res.status(400).json({
           ok: false,
-          message: 'La función debe programarse con al menos 45 minutos de anticipación respecto a la hora actual.'
+          message: 'La función debe programarse con al menos 24 horas de anticipación respecto a la hora actual.'
         });
       }
     }
